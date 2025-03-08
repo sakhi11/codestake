@@ -31,20 +31,33 @@ const AnimatedBackground = ({ className }: AnimatedBackgroundProps) => {
       speedX: number;
       speedY: number;
       color: string;
+      pulseSpeed: number;
+      pulseSize: number;
+      maxSize: number;
+      minSize: number;
 
       constructor() {
         this.x = Math.random() * canvas.width;
         this.y = Math.random() * canvas.height;
         this.size = Math.random() * 2 + 0.5;
-        this.speedX = (Math.random() - 0.5) * 0.2;
-        this.speedY = (Math.random() - 0.5) * 0.2;
-        this.color = `rgba(74, 144, 226, ${Math.random() * 0.5 + 0.1})`;
+        this.maxSize = this.size + 1;
+        this.minSize = this.size - 0.3;
+        this.speedX = (Math.random() - 0.5) * 0.3;
+        this.speedY = (Math.random() - 0.5) * 0.3;
+        // Create a mix of blue and orange nodes to match the app theme
+        this.color = Math.random() > 0.7 
+          ? `rgba(248, 161, 0, ${Math.random() * 0.5 + 0.2})` // Orange nodes (30%)
+          : `rgba(74, 144, 226, ${Math.random() * 0.5 + 0.2})`; // Blue nodes (70%)
+        this.pulseSpeed = 0.02 + Math.random() * 0.02;
+        this.pulseSize = this.minSize;
       }
 
       update() {
+        // Update position
         this.x += this.speedX;
         this.y += this.speedY;
 
+        // Bounce off edges
         if (this.x < 0 || this.x > canvas.width) {
           this.speedX = -this.speedX;
         }
@@ -52,6 +65,15 @@ const AnimatedBackground = ({ className }: AnimatedBackgroundProps) => {
         if (this.y < 0 || this.y > canvas.height) {
           this.speedY = -this.speedY;
         }
+
+        // Pulse size effect
+        this.pulseSize += this.pulseSpeed;
+        if (this.pulseSize > 1 || this.pulseSize < 0) {
+          this.pulseSpeed = -this.pulseSpeed;
+        }
+        
+        // Calculate current size based on pulse
+        this.size = this.minSize + (this.maxSize - this.minSize) * Math.abs(Math.sin(this.pulseSize));
       }
 
       draw() {
@@ -63,7 +85,7 @@ const AnimatedBackground = ({ className }: AnimatedBackgroundProps) => {
     }
 
     const nodes: Node[] = [];
-    const nodeCount = Math.min(80, Math.floor((canvas.width * canvas.height) / 15000));
+    const nodeCount = Math.min(100, Math.floor((canvas.width * canvas.height) / 12000));
 
     for (let i = 0; i < nodeCount; i++) {
       nodes.push(new Node());
@@ -74,10 +96,12 @@ const AnimatedBackground = ({ className }: AnimatedBackgroundProps) => {
       const dy = node1.y - node2.y;
       const distance = Math.sqrt(dx * dx + dy * dy);
 
-      const maxDistance = 150;
+      const maxDistance = 180;
       if (distance < maxDistance) {
         ctx.beginPath();
-        ctx.strokeStyle = `rgba(74, 144, 226, ${0.1 * (1 - distance / maxDistance)})`;
+        // Use the color of the first node for the connection
+        const opacity = 0.15 * (1 - distance / maxDistance);
+        ctx.strokeStyle = node1.color.replace(/[\d\.]+\)$/, `${opacity})`);
         ctx.lineWidth = 0.5;
         ctx.moveTo(node1.x, node1.y);
         ctx.lineTo(node2.x, node2.y);
@@ -85,7 +109,37 @@ const AnimatedBackground = ({ className }: AnimatedBackgroundProps) => {
       }
     };
 
-    const animate = () => {
+    // Create a subtle moving wave effect
+    const drawWaves = (timestamp: number) => {
+      const height = canvas.height;
+      const width = canvas.width;
+      
+      ctx.beginPath();
+      ctx.strokeStyle = "rgba(74, 144, 226, 0.05)";
+      ctx.lineWidth = 1;
+      
+      for (let i = 0; i < 3; i++) {
+        ctx.beginPath();
+        let waveHeight = 50 + i * 20;
+        
+        for (let x = 0; x < width; x += 5) {
+          const y = height / 2 + 
+                    Math.sin(x * 0.01 + timestamp * 0.001 + i) * waveHeight + 
+                    Math.sin(x * 0.02 - timestamp * 0.0015) * (waveHeight / 2);
+          
+          if (x === 0) {
+            ctx.moveTo(x, y);
+          } else {
+            ctx.lineTo(x, y);
+          }
+        }
+        
+        ctx.stroke();
+      }
+    };
+
+    let animationFrameId: number;
+    const animate = (timestamp: number) => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       
       // Draw grid pattern
@@ -107,6 +161,10 @@ const AnimatedBackground = ({ className }: AnimatedBackgroundProps) => {
         ctx.stroke();
       }
 
+      // Draw waves
+      drawWaves(timestamp);
+
+      // Update and draw nodes
       for (const node of nodes) {
         node.update();
         node.draw();
@@ -118,13 +176,14 @@ const AnimatedBackground = ({ className }: AnimatedBackgroundProps) => {
         }
       }
 
-      requestAnimationFrame(animate);
+      animationFrameId = requestAnimationFrame(animate);
     };
 
-    animate();
+    animate(0);
 
     return () => {
       window.removeEventListener("resize", resizeCanvas);
+      cancelAnimationFrame(animationFrameId);
     };
   }, []);
 

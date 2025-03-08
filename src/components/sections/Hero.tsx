@@ -2,7 +2,7 @@
 import React from "react";
 import { Button } from "@/components/ui/Button";
 import AnimatedBackground from "@/components/animations/AnimatedBackground";
-import { ChevronDown, Code, PlusCircle } from "lucide-react";
+import { ChevronDown, Code, PlusCircle, Sparkles } from "lucide-react";
 
 const Hero = () => {
   const scrollToSection = (id: string) => {
@@ -38,9 +38,13 @@ const Hero = () => {
             <Button 
               variant="gradient" 
               size="xl"
-              className="animate-glow"
+              className="relative group overflow-hidden transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-[0_0_25px_rgba(248,161,0,0.3)]"
+              style={{
+                background: "linear-gradient(135deg, #4A90E2 0%, #F8A100 100%)",
+              }}
             >
-              <PlusCircle className="mr-2 h-5 w-5" />
+              <div className="absolute inset-0 w-full h-full bg-white/10 opacity-0 group-hover:opacity-20 transition-opacity duration-300"></div>
+              <Sparkles className="mr-2 h-5 w-5 animate-pulse" />
               Create a Challenge
             </Button>
             

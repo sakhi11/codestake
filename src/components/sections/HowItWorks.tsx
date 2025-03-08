@@ -63,40 +63,40 @@ const HowItWorks = () => {
     <section 
       id="how-it-works" 
       ref={sectionRef}
-      className="py-20 bg-gradient-to-b from-web3-background to-web3-card relative overflow-hidden animate-on-scroll"
+      className="py-32 md:py-40 bg-gradient-to-b from-web3-background to-web3-card relative overflow-hidden animate-on-scroll"
     >
       <div className="container mx-auto px-4 md:px-6 relative z-10">
-        <div className="text-center mb-16">
-          <h2 className="text-3xl md:text-4xl font-bold mb-4 text-gradient">
+        <div className="text-center mb-20">
+          <h2 className="text-3xl md:text-5xl font-bold mb-6 text-gradient">
             How It Works
           </h2>
-          <p className="text-white/70 max-w-2xl mx-auto">
+          <p className="text-white/70 max-w-2xl mx-auto text-lg">
             Our platform makes it easy to participate in coding challenges. Follow these simple steps to get started.
           </p>
         </div>
         
-        <div className="max-w-4xl mx-auto relative">
+        <div className="max-w-5xl mx-auto relative min-h-[400px] md:min-h-[500px]">
           {/* Connecting line */}
-          <div className="absolute top-0 bottom-0 left-[27px] md:left-1/2 w-0.5 bg-gradient-to-b from-web3-blue to-web3-orange h-[calc(100%-40px)] mt-8 transform md:-translate-x-1/2 z-0"></div>
+          <div className="absolute top-0 bottom-0 left-[27px] md:left-1/2 w-1 bg-gradient-to-b from-web3-blue to-web3-orange h-[calc(100%-60px)] mt-8 transform md:-translate-x-1/2 z-0"></div>
           
-          <div className="space-y-12 md:space-y-0 relative z-10">
+          <div className="space-y-24 md:space-y-40 relative z-10">
             {steps.map((step, index) => (
               <div 
                 key={index}
                 ref={(el) => (stepsRef.current[index] = el)}
-                className="flex flex-col md:flex-row items-start md:items-center gap-4 animate-on-scroll"
-                style={{ transitionDelay: `${index * 150}ms` }}
+                className="flex flex-col md:flex-row items-start md:items-center gap-6 animate-on-scroll"
+                style={{ transitionDelay: `${index * 200}ms` }}
               >
                 <div className={`
-                  flex-shrink-0 w-14 h-14 rounded-full flex items-center justify-center glassmorphism 
-                  ${index === steps.length - 1 ? 'bg-web3-orange/10' : 'bg-web3-blue/10'} z-10
+                  flex-shrink-0 w-16 h-16 rounded-full flex items-center justify-center glassmorphism 
+                  ${index === steps.length - 1 ? 'bg-web3-orange/10 shadow-[0_0_15px_rgba(248,161,0,0.3)]' : 'bg-web3-blue/10 shadow-[0_0_15px_rgba(74,144,226,0.3)]'} z-10
                 `}>
                   {step.icon}
                 </div>
                 
-                <div className={`md:w-1/2 md:text-right md:pr-8 ${index % 2 === 0 ? 'md:order-first' : ''}`}>
-                  <h3 className="text-xl font-semibold mb-2">{step.title}</h3>
-                  <p className="text-white/70">{step.description}</p>
+                <div className={`md:w-1/2 md:text-right md:pr-10 ${index % 2 === 0 ? 'md:order-first' : ''}`}>
+                  <h3 className="text-2xl font-semibold mb-3">{step.title}</h3>
+                  <p className="text-white/70 text-lg">{step.description}</p>
                 </div>
                 
                 {index % 2 === 0 && <div className="hidden md:block md:w-1/2"></div>}
