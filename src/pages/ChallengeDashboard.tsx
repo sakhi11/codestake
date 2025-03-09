@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import DashboardNavbar from "@/components/layout/DashboardNavbar";
 import Footer from "@/components/layout/Footer";
@@ -11,8 +10,8 @@ import { useParams, Link } from "react-router-dom";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Progress } from "@/components/ui/progress";
+import QuizModal from "@/components/quiz/QuizModal";
 
-// Sample data for challenge - in a real app this would come from a database or blockchain
 const getChallengeData = (id: string) => {
   return {
     id,
@@ -107,8 +106,9 @@ const ChallengeDashboard = () => {
   const [challenge, setChallenge] = useState(getChallengeData(id || "ch-01"));
   const [expandedMilestone, setExpandedMilestone] = useState<string | null>(null);
   const [confetti, setConfetti] = useState(false);
+  const [quizModalOpen, setQuizModalOpen] = useState(false);
+  const [currentMilestone, setCurrentMilestone] = useState<{id: string; name: string; reward: number} | null>(null);
   
-  // Format date for display
   const formatDate = (date: Date) => {
     return new Intl.DateTimeFormat('en-US', { 
       month: 'short', 
@@ -118,18 +118,15 @@ const ChallengeDashboard = () => {
     }).format(date);
   };
   
-  // Format wallet address for display (0x71C7...976F)
   const formatAddress = (address: string) => {
     return `${address.slice(0, 6)}...${address.slice(-4)}`;
   };
   
-  // Calculate the total progress based on completed milestones
   const calculateProgress = () => {
     const completedMilestones = challenge.milestones.filter(m => m.isCompleted).length;
     return (completedMilestones / challenge.milestones.length) * 100;
   };
   
-  // Handle attempt quiz button
   const handleAttemptQuiz = (milestoneId: string) => {
     const milestone = challenge.milestones.find(m => m.id === milestoneId);
     if (!milestone) return;
@@ -144,36 +141,35 @@ const ChallengeDashboard = () => {
       return;
     }
     
-    toast.info("Opening quiz for " + milestone.name);
-    setExpandedMilestone(milestoneId);
+    setCurrentMilestone({
+      id: milestone.id,
+      name: milestone.name,
+      reward: milestone.reward
+    });
+    setQuizModalOpen(true);
+    setExpandedMilestone(null);
   };
   
-  // Handle mark as completed
-  const handleMarkCompleted = (milestoneId: string) => {
-    const milestone = challenge.milestones.find(m => m.id === milestoneId);
+  const handleQuizComplete = (passed: boolean) => {
+    if (!currentMilestone) return;
+    
+    if (!passed) {
+      toast.error("You didn't pass the quiz. Try again later!");
+      return;
+    }
+    
+    const milestone = challenge.milestones.find(m => m.id === currentMilestone.id);
     if (!milestone) return;
     
-    if (!milestone.isUnlocked) {
-      toast.error("This milestone is still locked!");
-      return;
-    }
-    
-    if (milestone.isCompleted) {
-      toast.info("This milestone has already been completed!");
-      return;
-    }
-    
-    // Check if this is the first completion
     const isFirst = !milestone.firstCompletedBy;
     
-    // Update milestone in state
     const updatedMilestones = challenge.milestones.map(m => {
-      if (m.id === milestoneId) {
+      if (m.id === currentMilestone.id) {
         return {
           ...m,
           isCompleted: true,
           firstCompletedBy: isFirst ? {
-            address: "0x71C7656EC7ab88b098defB751B7401B5f6d8976F", // Current user's address
+            address: "0x71C7656EC7ab88b098defB751B7401B5f6d8976F",
             timestamp: new Date()
           } : m.firstCompletedBy
         };
@@ -181,48 +177,39 @@ const ChallengeDashboard = () => {
       return m;
     });
     
-    // Add to activity log
     const updatedLogs = [
       {
         action: "milestone_completed",
-        milestone: milestoneId,
-        user: "0x71C7656EC7ab88b098defB751B7401B5f6d8976F", // Current user's address
+        milestone: currentMilestone.id,
+        user: "0x71C7656EC7ab88b098defB751B7401B5f6d8976F",
         timestamp: new Date(),
         reward: isFirst ? milestone.reward : 0
       },
       ...challenge.activityLog
     ];
     
-    // Update state
     setChallenge({
       ...challenge,
       milestones: updatedMilestones,
       activityLog: updatedLogs
     });
     
-    // Show confetti for a win
     if (isFirst) {
       setConfetti(true);
       toast.success(`Congratulations! You're the first to complete this milestone and won ${milestone.reward} ETH!`);
       
-      // Hide confetti after 4 seconds
       setTimeout(() => {
         setConfetti(false);
       }, 4000);
     } else {
       toast.success("Milestone marked as completed!");
     }
-    
-    // Close the expanded milestone
-    setExpandedMilestone(null);
   };
   
-  // Get time until milestone unlocks
   const getTimeUntilUnlock = (date: Date) => {
     const now = new Date();
     const diff = date.getTime() - now.getTime();
     
-    // If already unlocked
     if (diff <= 0) return "Unlocked";
     
     const days = Math.floor(diff / (1000 * 60 * 60 * 24));
@@ -241,7 +228,6 @@ const ChallengeDashboard = () => {
       <DashboardNavbar address="0x71C7656EC7ab88b098defB751B7401B5f6d8976F" />
       
       <main className="container mx-auto px-4 py-8 mt-16">
-        {/* Confetti overlay - only shown when confetti state is true */}
         {confetti && (
           <div className="fixed inset-0 pointer-events-none z-50">
             <div className="absolute inset-0 animate-confetti opacity-70">
@@ -250,7 +236,16 @@ const ChallengeDashboard = () => {
           </div>
         )}
         
-        {/* Challenge Overview Card */}
+        {currentMilestone && (
+          <QuizModal 
+            isOpen={quizModalOpen}
+            onClose={() => setQuizModalOpen(false)}
+            onComplete={handleQuizComplete}
+            track={challenge.track}
+            milestone={currentMilestone}
+          />
+        )}
+        
         <div className="mb-8 glassmorphism border border-white/10 rounded-xl p-6 relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-br from-web3-blue/5 via-transparent to-web3-orange/5 pointer-events-none"></div>
           
@@ -315,7 +310,6 @@ const ChallengeDashboard = () => {
           </div>
         </div>
         
-        {/* Progress Bar */}
         <div className="mb-8">
           <div className="flex items-center justify-between mb-2">
             <h2 className="text-xl font-bold text-gradient">Challenge Progress</h2>
@@ -324,7 +318,6 @@ const ChallengeDashboard = () => {
           <Progress value={calculateProgress()} className="h-2 bg-white/10" />
         </div>
         
-        {/* Milestones */}
         <section className="mb-8">
           <h2 className="text-xl md:text-2xl font-bold mb-6 text-gradient">Milestones</h2>
           
@@ -396,13 +389,12 @@ const ChallengeDashboard = () => {
                   </div>
                 </div>
                 
-                {/* Expanded content */}
                 {expandedMilestone === milestone.id && (
                   <div className="mt-6 pt-4 border-t border-white/10 animate-accordion-down">
                     <h4 className="text-white font-medium mb-2">Quiz Details</h4>
                     <p className="text-white/70 mb-4">
                       {milestone.name} quiz tests your knowledge of {challenge.track} fundamentals.
-                      You'll need to answer 10 multiple-choice questions correctly to earn the milestone completion.
+                      You'll need to answer 5 multiple-choice questions and complete 1 coding challenge to earn the milestone completion.
                     </p>
                     
                     <div className="flex items-center mb-4">
@@ -424,11 +416,14 @@ const ChallengeDashboard = () => {
                         style={{
                           background: "linear-gradient(135deg, #4A90E2 0%, #F8A100 100%)",
                         }}
-                        onClick={() => handleMarkCompleted(milestone.id)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleAttemptQuiz(milestone.id);
+                        }}
                       >
                         <div className="absolute inset-0 w-full h-full bg-white/10 opacity-0 group-hover:opacity-20 transition-opacity duration-300"></div>
-                        <CheckCircle className="mr-2 h-4 w-4" />
-                        Mark as Completed
+                        <BookOpen className="mr-2 h-4 w-4" />
+                        Start Quiz
                       </Button>
                     </div>
                   </div>
@@ -438,8 +433,9 @@ const ChallengeDashboard = () => {
           </div>
         </section>
         
-        {/* Rules and Guidelines */}
         <section className="mb-10">
+          <h2 className="text-xl md:text-2xl font-bold mb-6 text-gradient">Rules and Guidelines</h2>
+          
           <Card className="glassmorphism">
             <CardHeader>
               <CardTitle className="text-gradient">Challenge Rules & Guidelines</CardTitle>
@@ -481,7 +477,6 @@ const ChallengeDashboard = () => {
           </Card>
         </section>
         
-        {/* Activity Feed */}
         <section className="mb-10">
           <h2 className="text-xl md:text-2xl font-bold mb-6 text-gradient">Activity Log</h2>
           
@@ -563,7 +558,6 @@ const ChallengeDashboard = () => {
           </div>
         </section>
         
-        {/* Back to Dashboard Button */}
         <div className="text-center mb-10">
           <Link to="/dashboard">
             <Button variant="outline" size="lg">
