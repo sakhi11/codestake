@@ -39,7 +39,7 @@ const DashboardNavbar = ({ address }: DashboardNavbarProps) => {
         <div className="flex items-center justify-between">
           {/* Logo */}
           <Link to="/" className="text-xl font-semibold text-gradient">
-            stake<span className="text-web3-blue">&</span>code
+            Code<span className="text-web3-blue">Stake</span>
           </Link>
           
           {/* Desktop Navigation */}

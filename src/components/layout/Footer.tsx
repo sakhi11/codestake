@@ -13,7 +13,7 @@ const Footer = () => {
           {/* Logo and Description */}
           <div className="space-y-4">
             <h2 className="text-xl font-semibold text-gradient">
-              stake<span className="text-web3-blue">&</span>code
+              Code<span className="text-web3-blue">Stake</span>
             </h2>
             <p className="text-white/70 text-sm max-w-xs">
               A DeFi-based coding challenge platform where developers can compete, learn, and earn rewards.
@@ -127,7 +127,7 @@ const Footer = () => {
         
         <div className="border-t border-white/10 mt-10 pt-6 flex flex-col md:flex-row justify-between items-center">
           <p className="text-white/50 text-sm">
-            &copy; {new Date().getFullYear()} stake&code. All rights reserved.
+            &copy; {new Date().getFullYear()} CodeStake. All rights reserved.
           </p>
           <div className="mt-4 md:mt-0">
             <p className="text-white/50 text-sm">

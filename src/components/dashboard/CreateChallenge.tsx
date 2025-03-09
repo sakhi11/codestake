@@ -1,233 +1,312 @@
 
 import React, { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { PlusCircle, X } from "lucide-react";
-import { toast } from "sonner";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { PlusCircle, Sparkles, Users, BookOpen } from "lucide-react";
+
+// Track options for the challenge
+const TRACKS = [
+  { id: "javascript", name: "JavaScript" },
+  { id: "solidity", name: "Solidity" },
+  { id: "python", name: "Python" },
+  { id: "rust", name: "Rust" },
+  { id: "react", name: "React" }
+];
 
 interface CreateChallengeProps {
   onCreateChallenge: (challenge: any) => void;
 }
 
-const codingTracks = [
-  { value: "JavaScript", label: "JavaScript" },
-  { value: "Python", label: "Python" },
-  { value: "Solidity", label: "Solidity" },
-  { value: "React", label: "React" },
-  { value: "Web3", label: "Web3 Development" }
-];
-
 const CreateChallenge = ({ onCreateChallenge }: CreateChallengeProps) => {
   const [isExpanded, setIsExpanded] = useState(false);
-  const [formData, setFormData] = useState({
+  const [stakeAmount, setStakeAmount] = useState("");
+  const [participants, setParticipants] = useState<string[]>([""]);
+  const [selectedTrack, setSelectedTrack] = useState("");
+  const [errors, setErrors] = useState({
     stakeAmount: "",
-    totalPlayers: "2",
     participants: [""],
-    track: "JavaScript"
+    track: ""
   });
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-  };
-
-  const handleAddParticipant = () => {
-    if (formData.participants.length < (parseInt(formData.totalPlayers) - 1)) {
-      setFormData(prev => ({
-        ...prev,
-        participants: [...prev.participants, ""]
-      }));
-    } else {
-      toast.error(`Maximum ${formData.totalPlayers} participants allowed (including you)`);
+  // Toggle the form visibility
+  const toggleForm = () => {
+    setIsExpanded(!isExpanded);
+    
+    // Reset form when collapsing
+    if (isExpanded) {
+      resetForm();
     }
   };
 
-  const handleRemoveParticipant = (index: number) => {
-    setFormData(prev => ({
-      ...prev,
-      participants: prev.participants.filter((_, i) => i !== index)
-    }));
-  };
-
-  const handleParticipantChange = (index: number, value: string) => {
-    const updatedParticipants = [...formData.participants];
-    updatedParticipants[index] = value;
-    setFormData(prev => ({
-      ...prev,
-      participants: updatedParticipants
-    }));
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    // Validate form
-    if (!formData.stakeAmount || parseFloat(formData.stakeAmount) <= 0) {
-      toast.error("Please enter a valid stake amount");
-      return;
-    }
-    
-    // Validate wallet addresses (simplified validation for demo)
-    const invalidAddresses = formData.participants.filter(addr => !addr.startsWith("0x") || addr.length !== 42);
-    if (invalidAddresses.length > 0) {
-      toast.error("Please enter valid wallet addresses for all participants");
-      return;
-    }
-    
-    onCreateChallenge(formData);
-    
-    // Reset form
-    setFormData({
+  // Reset the form to its initial state
+  const resetForm = () => {
+    setStakeAmount("");
+    setParticipants([""]);
+    setSelectedTrack("");
+    setErrors({
       stakeAmount: "",
-      totalPlayers: "2",
       participants: [""],
-      track: "JavaScript"
+      track: ""
+    });
+  };
+
+  // Add a new participant input field
+  const addParticipant = () => {
+    if (participants.length < 4) { // Maximum 5 participants (including the creator)
+      setParticipants([...participants, ""]);
+      setErrors({
+        ...errors,
+        participants: [...errors.participants, ""]
+      });
+    }
+  };
+
+  // Remove a participant input field
+  const removeParticipant = (index: number) => {
+    const updatedParticipants = [...participants];
+    updatedParticipants.splice(index, 1);
+    setParticipants(updatedParticipants);
+    
+    const updatedErrors = [...errors.participants];
+    updatedErrors.splice(index, 1);
+    setErrors({
+      ...errors,
+      participants: updatedErrors
+    });
+  };
+
+  // Update a participant's address at the specified index
+  const updateParticipant = (index: number, value: string) => {
+    const updatedParticipants = [...participants];
+    updatedParticipants[index] = value;
+    setParticipants(updatedParticipants);
+    
+    // Clear error for this field if it has a value
+    if (value) {
+      const updatedErrors = [...errors.participants];
+      updatedErrors[index] = "";
+      setErrors({
+        ...errors,
+        participants: updatedErrors
+      });
+    }
+  };
+
+  // Validate the form fields
+  const validateForm = () => {
+    let valid = true;
+    const newErrors = {
+      stakeAmount: "",
+      participants: [...participants.map(() => "")],
+      track: ""
+    };
+    
+    // Validate stake amount
+    if (!stakeAmount) {
+      newErrors.stakeAmount = "Stake amount is required";
+      valid = false;
+    } else if (isNaN(Number(stakeAmount)) || Number(stakeAmount) <= 0) {
+      newErrors.stakeAmount = "Please enter a valid amount";
+      valid = false;
+    }
+    
+    // Validate participant addresses
+    participants.forEach((participant, index) => {
+      if (!participant) {
+        newErrors.participants[index] = "Wallet address is required";
+        valid = false;
+      } else if (!/^0x[a-fA-F0-9]{40}$/.test(participant)) {
+        newErrors.participants[index] = "Invalid Ethereum address";
+        valid = false;
+      }
     });
     
-    setIsExpanded(false);
+    // Validate track selection
+    if (!selectedTrack) {
+      newErrors.track = "Please select a track";
+      valid = false;
+    }
+    
+    setErrors(newErrors);
+    return valid;
+  };
+
+  // Handle form submission
+  const handleSubmit = () => {
+    if (validateForm()) {
+      onCreateChallenge({
+        stakeAmount,
+        participants: participants.filter(p => p), // Filter out empty addresses
+        track: TRACKS.find(t => t.id === selectedTrack)?.name || selectedTrack
+      });
+      
+      // Reset and collapse the form
+      resetForm();
+      setIsExpanded(false);
+    }
   };
 
   return (
-    <section className="mb-12" id="create-challenge">
-      <div className="glassmorphism border border-white/10 rounded-xl p-6 md:p-8 relative overflow-hidden">
-        {/* Background pseudo-element with gradient */}
-        <div className="absolute inset-0 bg-gradient-to-br from-web3-blue/5 via-transparent to-web3-orange/5 pointer-events-none"></div>
-        
-        <div className="relative z-10">
-          <h2 className="text-xl md:text-2xl font-bold mb-4 text-gradient">Create a New Challenge</h2>
-          
-          <p className="text-white/70 mb-6">
-            Set up a new challenge, invite participants, and start earning rewards by completing milestones!
-          </p>
-          
-          {!isExpanded ? (
-            <Button 
-              variant="gradient" 
-              size="lg"
-              className="group overflow-hidden transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-[0_0_25px_rgba(248,161,0,0.3)]"
-              style={{
-                background: "linear-gradient(135deg, #4A90E2 0%, #F8A100 100%)",
-              }}
-              onClick={() => setIsExpanded(true)}
-            >
-              <div className="absolute inset-0 w-full h-full bg-white/10 opacity-0 group-hover:opacity-20 transition-opacity duration-300"></div>
-              <PlusCircle className="mr-2 h-5 w-5" />
-              Create a New Challenge
-            </Button>
-          ) : (
-            <form onSubmit={handleSubmit} className="animate-fade-in">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                <div>
-                  <label className="block text-white mb-2 font-medium">Stake Amount (ETH)</label>
-                  <input
-                    type="number"
-                    name="stakeAmount"
-                    value={formData.stakeAmount}
-                    onChange={handleChange}
+    <section className="mb-12">
+      {!isExpanded ? (
+        <Button 
+          onClick={toggleForm}
+          className="w-full py-10 flex items-center justify-center gap-3 relative group overflow-hidden transition-all duration-300 transform hover:scale-105 hover:shadow-[0_0_25px_rgba(248,161,0,0.3)]"
+          style={{ 
+            background: "linear-gradient(135deg, #4A90E2 0%, #F8A100 100%)",
+          }}
+        >
+          <div className="absolute inset-0 w-full h-full bg-white/10 opacity-0 group-hover:opacity-20 transition-opacity duration-300"></div>
+          <PlusCircle className="h-6 w-6 text-white" />
+          <span className="text-xl font-semibold">Create a New Challenge</span>
+        </Button>
+      ) : (
+        <Card className="glassmorphism border border-white/10 mb-8">
+          <CardHeader>
+            <CardTitle className="text-gradient flex items-center">
+              <Sparkles className="h-5 w-5 mr-2 text-web3-orange" />
+              Create a New Learning Challenge
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-6">
+              {/* Stake Amount */}
+              <div className="space-y-2">
+                <Label htmlFor="stake-amount" className="text-white">
+                  Stake Amount (ETH)
+                </Label>
+                <div className="relative">
+                  <Input
+                    id="stake-amount"
+                    type="text"
+                    value={stakeAmount}
+                    onChange={(e) => setStakeAmount(e.target.value)}
                     placeholder="0.1"
-                    step="0.01"
-                    min="0.01"
-                    className="w-full bg-black/30 border border-white/20 rounded-lg p-3 text-white"
-                    required
+                    className={`bg-web3-card border ${errors.stakeAmount ? 'border-web3-orange' : 'border-white/10'} text-white placeholder:text-white/50`}
                   />
-                  <p className="text-white/50 text-xs mt-1">Minimum amount each participant will stake</p>
-                </div>
-                
-                <div>
-                  <label className="block text-white mb-2 font-medium">Total Players</label>
-                  <select
-                    name="totalPlayers"
-                    value={formData.totalPlayers}
-                    onChange={handleChange}
-                    className="w-full bg-black/30 border border-white/20 rounded-lg p-3 text-white"
-                  >
-                    <option value="2">2 Players</option>
-                    <option value="3">3 Players</option>
-                    <option value="4">4 Players</option>
-                    <option value="5">5 Players</option>
-                  </select>
-                  <p className="text-white/50 text-xs mt-1">Including yourself</p>
-                </div>
-                
-                <div>
-                  <label className="block text-white mb-2 font-medium">Coding Track</label>
-                  <select
-                    name="track"
-                    value={formData.track}
-                    onChange={handleChange}
-                    className="w-full bg-black/30 border border-white/20 rounded-lg p-3 text-white"
-                  >
-                    {codingTracks.map(track => (
-                      <option key={track.value} value={track.value}>{track.label}</option>
-                    ))}
-                  </select>
-                  <p className="text-white/50 text-xs mt-1">Determines milestones and quizzes</p>
-                </div>
-                
-                <div className="md:col-span-2">
-                  <label className="block text-white mb-2 font-medium">Participant Wallet Addresses</label>
-                  <p className="text-white/50 text-xs mb-2">Enter the wallet addresses of other participants</p>
-                  
-                  {formData.participants.map((participant, index) => (
-                    <div key={index} className="flex items-center mb-2">
-                      <input
-                        type="text"
-                        value={participant}
-                        onChange={(e) => handleParticipantChange(index, e.target.value)}
-                        placeholder="0x..."
-                        className="flex-1 bg-black/30 border border-white/20 rounded-lg p-3 text-white"
-                      />
-                      {formData.participants.length > 1 && (
-                        <button
-                          type="button"
-                          className="ml-2 text-white/60 hover:text-white p-1"
-                          onClick={() => handleRemoveParticipant(index)}
-                        >
-                          <X className="h-5 w-5" />
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                  
-                  {formData.participants.length < (parseInt(formData.totalPlayers) - 1) && (
-                    <button
-                      type="button"
-                      className="flex items-center text-web3-blue hover:text-web3-blue/80 mt-2"
-                      onClick={handleAddParticipant}
-                    >
-                      <PlusCircle className="h-4 w-4 mr-1" />
-                      Add Another Participant
-                    </button>
+                  {errors.stakeAmount && (
+                    <p className="text-web3-orange text-sm mt-1">{errors.stakeAmount}</p>
                   )}
                 </div>
               </div>
               
-              <div className="flex items-center space-x-4">
+              {/* Participants */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label className="text-white flex items-center">
+                    <Users className="h-4 w-4 mr-2 text-web3-blue" />
+                    Challenge Participants
+                  </Label>
+                  {participants.length < 4 && (
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={addParticipant}
+                      className="text-web3-blue"
+                    >
+                      <PlusCircle className="h-4 w-4 mr-1" /> Add Participant
+                    </Button>
+                  )}
+                </div>
+                
+                <div className="space-y-3">
+                  {participants.map((participant, index) => (
+                    <div key={index} className="flex gap-2">
+                      <div className="flex-1">
+                        <Input
+                          value={participant}
+                          onChange={(e) => updateParticipant(index, e.target.value)}
+                          placeholder="0x... (Ethereum Address)"
+                          className={`bg-web3-card border ${errors.participants[index] ? 'border-web3-orange' : 'border-white/10'} text-white placeholder:text-white/50`}
+                        />
+                        {errors.participants[index] && (
+                          <p className="text-web3-orange text-sm mt-1">{errors.participants[index]}</p>
+                        )}
+                      </div>
+                      
+                      {index > 0 && (
+                        <Button 
+                          type="button" 
+                          variant="outline" 
+                          size="icon" 
+                          onClick={() => removeParticipant(index)}
+                          className="text-web3-orange"
+                        >
+                          <span className="sr-only">Remove</span>
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            width="24"
+                            height="24"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            className="h-4 w-4"
+                          >
+                            <path d="M18 6 6 18"></path>
+                            <path d="m6 6 12 12"></path>
+                          </svg>
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+              
+              {/* Track Selection */}
+              <div className="space-y-2">
+                <Label htmlFor="track" className="text-white flex items-center">
+                  <BookOpen className="h-4 w-4 mr-2 text-web3-blue" />
+                  Select Track
+                </Label>
+                <Select value={selectedTrack} onValueChange={setSelectedTrack}>
+                  <SelectTrigger className={`bg-web3-card border ${errors.track ? 'border-web3-orange' : 'border-white/10'} text-white`}>
+                    <SelectValue placeholder="Select a track" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-web3-card border border-white/10 text-white">
+                    {TRACKS.map((track) => (
+                      <SelectItem key={track.id} value={track.id} className="focus:bg-white/10 focus:text-white">
+                        {track.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {errors.track && (
+                  <p className="text-web3-orange text-sm mt-1">{errors.track}</p>
+                )}
+              </div>
+              
+              {/* Action Buttons */}
+              <div className="flex justify-end space-x-4 pt-4">
                 <Button 
-                  type="submit" 
-                  variant="gradient" 
-                  size="lg"
-                  className="group overflow-hidden transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-[0_0_25px_rgba(248,161,0,0.3)]"
-                  style={{
+                  variant="outline" 
+                  onClick={toggleForm}
+                  className="border-white/20 hover:bg-white/5"
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={handleSubmit}
+                  className="relative group overflow-hidden transition-all duration-300 transform hover:scale-105 hover:shadow-[0_0_25px_rgba(248,161,0,0.3)]"
+                  style={{ 
                     background: "linear-gradient(135deg, #4A90E2 0%, #F8A100 100%)",
                   }}
                 >
                   <div className="absolute inset-0 w-full h-full bg-white/10 opacity-0 group-hover:opacity-20 transition-opacity duration-300"></div>
+                  <Sparkles className="mr-2 h-5 w-5" />
                   Create Challenge
                 </Button>
-                
-                <Button 
-                  type="button" 
-                  variant="outline" 
-                  size="lg"
-                  onClick={() => setIsExpanded(false)}
-                >
-                  Cancel
-                </Button>
               </div>
-            </form>
-          )}
-        </div>
-      </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </section>
   );
 };

@@ -8,8 +8,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useParams, Link } from "react-router-dom";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/Button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Progress } from "@/components/ui/progress";
 
 // Sample data for challenge - in a real app this would come from a database or blockchain
@@ -420,7 +420,6 @@ const ChallengeDashboard = () => {
                         Cancel
                       </Button>
                       <Button 
-                        variant="gradient" 
                         className="group overflow-hidden transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-[0_0_25px_rgba(248,161,0,0.3)]"
                         style={{
                           background: "linear-gradient(135deg, #4A90E2 0%, #F8A100 100%)",
