@@ -2,8 +2,10 @@
 import React, { useEffect, useRef } from "react";
 import { Button } from "@/components/ui/Button";
 import { ArrowRight, PlusCircle, Sparkles } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 const CtaSection = () => {
+  const navigate = useNavigate();
   const sectionRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -29,10 +31,22 @@ const CtaSection = () => {
     };
   }, []);
 
+  const handleCreateChallenge = () => {
+    // In a real app, this would trigger a wallet connection first
+    // For now, simply navigate to the dashboard
+    navigate("/dashboard");
+  };
+
+  const handleJoinChallenge = () => {
+    // In a real app, this would trigger a wallet connection first
+    // For now, simply navigate to the dashboard
+    navigate("/dashboard");
+  };
+
   return (
     <section
       ref={sectionRef}
-      className="py-20 relative overflow-hidden animate-on-scroll"
+      className="py-24 relative overflow-hidden animate-on-scroll"
     >
       <div className="absolute inset-0 bg-gradient-to-br from-web3-background via-web3-card to-web3-background opacity-50"></div>
       
@@ -55,6 +69,7 @@ const CtaSection = () => {
                 style={{
                   background: "linear-gradient(135deg, #4A90E2 0%, #F8A100 100%)",
                 }}
+                onClick={handleCreateChallenge}
               >
                 <div className="absolute inset-0 w-full h-full bg-white/10 opacity-0 group-hover:opacity-20 transition-opacity duration-300"></div>
                 <Sparkles className="mr-2 h-5 w-5 animate-pulse" />
@@ -65,6 +80,7 @@ const CtaSection = () => {
                 variant="glass" 
                 size="xl"
                 className="hover:bg-white/10"
+                onClick={handleJoinChallenge}
               >
                 Join an Ongoing Challenge
                 <ArrowRight className="ml-2 h-5 w-5" />

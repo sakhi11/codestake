@@ -3,13 +3,22 @@ import React from "react";
 import { Button } from "@/components/ui/Button";
 import AnimatedBackground from "@/components/animations/AnimatedBackground";
 import { ChevronDown, Code, PlusCircle, Sparkles } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 const Hero = () => {
+  const navigate = useNavigate();
+  
   const scrollToSection = (id: string) => {
     const element = document.getElementById(id);
     if (element) {
       element.scrollIntoView({ behavior: "smooth" });
     }
+  };
+
+  const handleCreateChallenge = () => {
+    // In a real app, this would trigger a wallet connection first
+    // For now, simply navigate to the dashboard
+    navigate("/dashboard");
   };
 
   return (
@@ -42,6 +51,7 @@ const Hero = () => {
               style={{
                 background: "linear-gradient(135deg, #4A90E2 0%, #F8A100 100%)",
               }}
+              onClick={handleCreateChallenge}
             >
               <div className="absolute inset-0 w-full h-full bg-white/10 opacity-0 group-hover:opacity-20 transition-opacity duration-300"></div>
               <Sparkles className="mr-2 h-5 w-5 animate-pulse" />
