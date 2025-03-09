@@ -1,24 +1,67 @@
-
-import React from "react";
-import { Button } from "@/components/ui/Button";
-import AnimatedBackground from "@/components/animations/AnimatedBackground";
-import { ChevronDown, Code, PlusCircle, Sparkles } from "lucide-react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { Button } from "@/components/ui/button";
+import AnimatedBackground from "@/components/animations/AnimatedBackground";
+import { ChevronDown, Code, Sparkles } from "lucide-react";
+import { toast } from "sonner";
+
+// Define the Ethereum object globally
+declare global {
+  interface Window {
+    ethereum?: {
+      request: (args: { method: string }) => Promise<string[]>;
+    };
+  }
+}
 
 const Hero = () => {
   const navigate = useNavigate();
-  
+  const [walletAddress, setWalletAddress] = useState<string | null>(null);
+
+  // Load wallet address from localStorage (if previously connected)
+  useEffect(() => {
+    const storedWallet = localStorage.getItem("walletAddress");
+    if (storedWallet) {
+      setWalletAddress(storedWallet);
+    }
+  }, []);
+
+  // Function to handle wallet connection
+  const handleCreateChallenge = async () => {
+    try {
+      // Check if MetaMask is installed
+      if (!window.ethereum) {
+        toast.error("Please install MetaMask to continue!");
+        return;
+      }
+
+      // Request account access
+      const accounts = await window.ethereum.request({ method: "eth_requestAccounts" });
+
+      if (accounts.length > 0) {
+        const connectedWallet = accounts[0]; // First account
+        setWalletAddress(connectedWallet);
+        localStorage.setItem("walletAddress", connectedWallet); // Store wallet in localStorage
+
+        toast.success(`Wallet Connected: ${connectedWallet.slice(0, 6)}...${connectedWallet.slice(-4)}`);
+        
+        // Redirect to dashboard
+        navigate("/dashboard");
+      } else {
+        toast.warning("No wallet selected. Please try again.");
+      }
+    } catch (error) {
+      console.error("Error connecting wallet:", error);
+      toast.error("Failed to connect wallet. Please try again.");
+    }
+  };
+
+  // Function to scroll to a section
   const scrollToSection = (id: string) => {
     const element = document.getElementById(id);
     if (element) {
       element.scrollIntoView({ behavior: "smooth" });
     }
-  };
-
-  const handleCreateChallenge = () => {
-    // In a real app, this would trigger a wallet connection first
-    // For now, simply navigate to the dashboard
-    navigate("/dashboard");
   };
 
   return (
@@ -45,8 +88,8 @@ const Hero = () => {
           
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 animate-fade-in">
             <Button 
-              variant="gradient" 
-              size="xl"
+              variant="default"
+              size="lg"
               className="relative group overflow-hidden transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-[0_0_25px_rgba(248,161,0,0.3)]"
               style={{
                 background: "linear-gradient(135deg, #4A90E2 0%, #F8A100 100%)",
@@ -55,12 +98,12 @@ const Hero = () => {
             >
               <div className="absolute inset-0 w-full h-full bg-white/10 opacity-0 group-hover:opacity-20 transition-opacity duration-300"></div>
               <Sparkles className="mr-2 h-5 w-5 animate-pulse" />
-              Create a Challenge
+              {walletAddress ? "Go to Dashboard" : "Connect Wallet"}
             </Button>
             
             <Button 
-              variant="glass" 
-              size="xl"
+              variant="outline" 
+              size="lg"
               onClick={() => scrollToSection("challenges")}
             >
               Explore Challenges

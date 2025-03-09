@@ -1,89 +1,218 @@
-
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import DashboardNavbar from "@/components/layout/DashboardNavbar";
 import WalletSummary from "@/components/dashboard/WalletSummary";
 import CreateChallenge from "@/components/dashboard/CreateChallenge";
 import OngoingChallenges from "@/components/dashboard/OngoingChallenges";
 import Footer from "@/components/layout/Footer";
 import { toast } from "sonner";
+import { useWeb3 } from "@/context/Web3Provider";
+import { ethers } from "ethers";
+
+interface Challenge {
+  id: string;
+  creator: string;
+  player1: string;
+  player2: string;
+  stakedAmount: number;
+  totalStake: number;
+  isActive: boolean;
+  track?: string;
+  milestones?: string[];
+}
+
+interface WalletSummary {
+  totalStaked: number;
+  ongoingChallenges: number;
+  totalWinnings: number;
+  milestonesCompleted: number;
+}
+
+interface NewChallenge {
+  player1: string;
+  player2: string;
+  stakeAmount: string;
+  track: string;
+}
+
+interface OngoingChallengesProps {
+  challenges: Challenge[];
+  isLoading: boolean;
+  userAddress: string;
+}
 
 const Dashboard = () => {
-  // Mock wallet data - in a real app, this would come from wallet connection
-  const [walletData] = useState({
-    address: "0x71C7656EC7ab88b098defB751B7401B5f6d8976F",
-    totalStaked: 1.45,
-    ongoingChallenges: 2,
-    totalWinnings: 0.87,
-    milestonesCompleted: 3
+  const { wallet, contract, isConnected } = useWeb3();
+  const [challenges, setChallenges] = useState<Challenge[]>([]);
+  const [summary, setSummary] = useState<WalletSummary>({
+    totalStaked: 0,
+    ongoingChallenges: 0,
+    totalWinnings: 0,
+    milestonesCompleted: 0,
   });
+  const [isLoading, setIsLoading] = useState(false);
 
-  // Mock challenge data - in a real app, this would come from a database or blockchain
-  const [challenges, setChallenges] = useState([
-    {
-      id: "ch-01",
-      name: "Solidity Masters - Group 3",
-      stakedAmount: 0.75,
-      participants: [
-        { address: "0x71C7656EC7ab88b098defB751B7401B5f6d8976F", avatar: "/placeholder.svg" },
-        { address: "0x8626f6940E2eb28930eFb4CeF49B2d1F2C9C1199", avatar: "/placeholder.svg" },
-        { address: "0xdD2FD4581271e230360230F9337D5c0430Bf44C0", avatar: "/placeholder.svg" }
-      ],
-      nextMilestoneDate: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000), // 2 days from now
-      progress: 33, // percent
-      track: "Solidity"
-    },
-    {
-      id: "ch-02",
-      name: "JavaScript Challenge - Advanced",
-      stakedAmount: 0.7,
-      participants: [
-        { address: "0x71C7656EC7ab88b098defB751B7401B5f6d8976F", avatar: "/placeholder.svg" },
-        { address: "0xdD2FD4581271e230360230F9337D5c0430Bf44C0", avatar: "/placeholder.svg" }
-      ],
-      nextMilestoneDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000), // 5 days from now
-      progress: 66, // percent
-      track: "JavaScript"
+  useEffect(() => {
+    console.log("Wallet:", wallet);
+    console.log("Is Connected:", isConnected);
+    console.log("Contract:", contract);
+  }, [wallet, isConnected, contract]);
+
+  useEffect(() => {
+    const init = async () => {
+      if (wallet) {
+        await fetchChallenges();
+      }
+    };
+    init();
+  }, [wallet]);
+
+  const fetchChallenges = async () => {
+    if (!contract || !wallet) {
+      toast.error("Please connect your wallet");
+      return;
     }
-  ]);
 
-  const handleCreateChallenge = (newChallenge) => {
-    // In a real app, this would involve blockchain transactions
-    setChallenges([...challenges, {
-      id: `ch-${challenges.length + 1}`,
-      name: `${newChallenge.track} Challenge - Group ${challenges.length + 1}`,
-      stakedAmount: Number(newChallenge.stakeAmount),
-      participants: [
-        { address: walletData.address, avatar: "/placeholder.svg" },
-        ...newChallenge.participants.map(address => ({ 
-          address, 
-          avatar: "/placeholder.svg" 
-        }))
-      ],
-      nextMilestoneDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
-      progress: 0,
-      track: newChallenge.track
-    }]);
-    
-    toast.success("New challenge created successfully!");
+    setIsLoading(true);
+    try {
+      // Get challenge count from contract
+      const challengeCount = await contract.challengeCounter();
+      const fetchedChallenges: Challenge[] = [];
+
+      // Fetch challenges in parallel for better performance
+      const challengePromises = Array.from({ length: Number(challengeCount) }, (_, i) =>
+        fetchChallengeDetails(i)
+      );
+
+      const resolvedChallenges = await Promise.all(challengePromises);
+      setChallenges(resolvedChallenges.filter(Boolean) as Challenge[]);
+
+      // Calculate summary
+      updateSummary(resolvedChallenges.filter(Boolean) as Challenge[]);
+    } catch (error) {
+      console.error("Error fetching challenges:", error);
+      toast.error("Failed to fetch challenges. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
   };
+
+  const fetchChallengeDetails = async (index: number): Promise<Challenge | null> => {
+    try {
+      const challenge = await contract.challenges(index);
+      if (!challenge) return null;
+
+      return {
+        id: index.toString(),
+        creator: challenge.creator,
+        player1: challenge.player1,
+        player2: challenge.player2,
+        stakedAmount: Number(ethers.formatEther(challenge.stakedAmount)),
+        totalStake: Number(ethers.formatEther(challenge.totalStake)),
+        isActive: challenge.isActive,
+        track: challenge.track || "",
+        milestones: challenge.milestones || [],
+      };
+    } catch (error) {
+      console.error(`Error fetching challenge ${index}:`, error);
+      return null;
+    }
+  };
+
+  const updateSummary = (fetchedChallenges: Challenge[]) => {
+    const summary = fetchedChallenges.reduce(
+      (acc, challenge) => {
+        if (challenge.isActive && (challenge.player1 === wallet || challenge.player2 === wallet)) {
+          acc.totalStaked += challenge.stakedAmount;
+          acc.ongoingChallenges += 1;
+        }
+        return acc;
+      },
+      {
+        totalStaked: 0,
+        ongoingChallenges: 0,
+        totalWinnings: 0, // Will be updated when contract provides this info
+        milestonesCompleted: 0, // Will be updated when contract provides this info
+      }
+    );
+
+    setSummary(summary);
+  };
+
+  const handleCreateChallenge = async (newChallenge: NewChallenge) => {
+    if (!contract || !wallet) {
+      toast.error("Please connect your wallet");
+      return;
+    }
+
+    if (!ethers.isAddress(newChallenge.player1) || !ethers.isAddress(newChallenge.player2)) {
+      toast.error("Invalid wallet addresses provided");
+      return;
+    }
+
+    try {
+      const stakeInWei = ethers.parseEther(newChallenge.stakeAmount);
+      
+      // Show pending toast
+      toast.loading("Creating challenge...");
+
+      const tx = await contract.createChallenge(
+        newChallenge.player1,
+        newChallenge.player2,
+        newChallenge.track,
+        {
+          value: stakeInWei,
+        }
+      );
+
+      // Wait for transaction confirmation
+      const receipt = await tx.wait();
+      
+      if (receipt.status === 1) {
+        toast.success("Challenge created successfully!");
+        await fetchChallenges(); // Refresh challenges
+      } else {
+        toast.error("Transaction failed. Please try again.");
+      }
+    } catch (error: any) {
+      console.error("Error creating challenge:", error);
+      toast.error(
+        error.reason || error.message || "Failed to create challenge. Please try again."
+      );
+    }
+  };
+
+  if (!wallet) {
+    return (
+      <div className="min-h-screen bg-web3-background">
+        <DashboardNavbar address={wallet} />
+        <main className="container mx-auto px-4 py-8 mt-16">
+          <div className="text-center">
+            <h2 className="text-2xl font-bold text-white mb-4">Please connect your wallet</h2>
+            <p className="text-white/70">Connect your wallet to view your dashboard</p>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-web3-background">
-      <DashboardNavbar address={walletData.address} />
-      
+      <DashboardNavbar address={wallet} />
       <main className="container mx-auto px-4 py-8 mt-16">
-        <WalletSummary 
-          totalStaked={walletData.totalStaked}
-          ongoingChallenges={walletData.ongoingChallenges}
-          totalWinnings={walletData.totalWinnings}
-          milestonesCompleted={walletData.milestonesCompleted}
+        <WalletSummary
+          totalStaked={summary.totalStaked}
+          ongoingChallenges={summary.ongoingChallenges}
+          totalWinnings={summary.totalWinnings}
+          milestonesCompleted={summary.milestonesCompleted}
         />
-        
         <CreateChallenge onCreateChallenge={handleCreateChallenge} />
-        
-        <OngoingChallenges challenges={challenges} />
+        <OngoingChallenges 
+          challenges={challenges} 
+          isLoading={isLoading}
+          userAddress={wallet}
+        />
       </main>
-      
       <Footer />
     </div>
   );

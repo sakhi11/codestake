@@ -1,5 +1,4 @@
-
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import DashboardNavbar from "@/components/layout/DashboardNavbar";
 import Footer from "@/components/layout/Footer";
 import { 
@@ -13,48 +12,146 @@ import {
 } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
+import { useWeb3 } from "@/context/Web3Provider";
+import { ethers } from "ethers";
 
-// Example transaction data
-const transactionHistory = [
-  {
-    id: "tx-001",
-    type: "earned",
-    amount: 0.15,
-    date: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
-    description: "First completion reward for Solidity Masters - Milestone 1",
-    challenge: "Solidity Masters - Group 3"
-  },
-  {
-    id: "tx-002",
-    type: "staked",
-    amount: 0.75,
-    date: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
-    description: "Staked for challenge participation",
-    challenge: "Solidity Masters - Group 3"
-  },
-  {
-    id: "tx-003",
-    type: "deposited",
-    amount: 1.0,
-    date: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000),
-    description: "Deposit to CodeStake wallet"
-  },
-  {
-    id: "tx-004",
-    type: "withdrawn",
-    amount: 0.5,
-    date: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
-    description: "Withdrawal to external wallet"
-  }
-];
+interface Transaction {
+  id: string;
+  type: "earned" | "staked" | "deposited" | "withdrawn";
+  amount: number;
+  date: Date;
+  description: string;
+  challenge?: string;
+}
+
+interface WalletSummary {
+  balance: number;
+  totalEarned: number;
+  totalStaked: number;
+}
 
 const Balance = () => {
-  const [balance, setBalance] = useState(1.25);
+  const { wallet, contract } = useWeb3();
+  const [summary, setSummary] = useState<WalletSummary>({
+    balance: 0,
+    totalEarned: 0,
+    totalStaked: 0
+  });
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
   const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false);
   const [depositAmount, setDepositAmount] = useState("");
   const [withdrawAmount, setWithdrawAmount] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  
+  useEffect(() => {
+    if (wallet && contract) {
+      fetchWalletData();
+    }
+  }, [wallet, contract]);
+  
+  const fetchWalletData = async () => {
+    try {
+      setIsLoading(true);
+      
+      // Fetch wallet summary from contract
+      const walletSummary = await contract.getWalletSummary(wallet);
+      setSummary({
+        balance: Number(ethers.formatEther(walletSummary.balance)),
+        totalEarned: Number(ethers.formatEther(walletSummary.totalEarned)),
+        totalStaked: Number(ethers.formatEther(walletSummary.totalStaked))
+      });
+
+      // Fetch transaction history from contract
+      const txHistory = await contract.getTransactionHistory(wallet);
+      const formattedTxs = txHistory.map((tx: any) => ({
+        id: tx.id,
+        type: tx.txType,
+        amount: Number(ethers.formatEther(tx.amount)),
+        date: new Date(Number(tx.timestamp) * 1000),
+        description: tx.description,
+        challenge: tx.challenge || undefined
+      }));
+
+      setTransactions(formattedTxs);
+    } catch (error) {
+      console.error("Error fetching wallet data:", error);
+      toast.error("Failed to load wallet data");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  const handleDeposit = async () => {
+    if (!depositAmount || parseFloat(depositAmount) <= 0) {
+      toast.error("Please enter a valid amount");
+      return;
+    }
+    
+    try {
+      setIsProcessing(true);
+      const amountInWei = ethers.parseEther(depositAmount);
+
+      // Show pending toast
+      toast.loading("Processing deposit...");
+
+      const tx = await contract.deposit({
+        value: amountInWei,
+        gasLimit: 300000 // Adjust as needed
+      });
+
+      await tx.wait();
+      
+      await fetchWalletData(); // Refresh data
+      setIsDepositModalOpen(false);
+      setDepositAmount("");
+      
+      toast.success(`Successfully deposited ${depositAmount} ETH`);
+    } catch (error: any) {
+      console.error("Deposit error:", error);
+      toast.error(error.reason || "Failed to process deposit");
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+  
+  const handleWithdraw = async () => {
+    if (!withdrawAmount || parseFloat(withdrawAmount) <= 0) {
+      toast.error("Please enter a valid amount");
+      return;
+    }
+    
+    if (parseFloat(withdrawAmount) > summary.balance) {
+      toast.error("Insufficient balance");
+      return;
+    }
+    
+    try {
+      setIsProcessing(true);
+      const amountInWei = ethers.parseEther(withdrawAmount);
+
+      // Show pending toast
+      toast.loading("Processing withdrawal...");
+
+      const tx = await contract.withdraw(amountInWei, {
+        gasLimit: 300000 // Adjust as needed
+      });
+
+      await tx.wait();
+      
+      await fetchWalletData(); // Refresh data
+      setIsWithdrawModalOpen(false);
+      setWithdrawAmount("");
+      
+      toast.success(`Successfully withdrawn ${withdrawAmount} ETH`);
+    } catch (error: any) {
+      console.error("Withdrawal error:", error);
+      toast.error(error.reason || "Failed to process withdrawal");
+    } finally {
+      setIsProcessing(false);
+    }
+  };
   
   const formatDate = (date: Date) => {
     return new Intl.DateTimeFormat('en-US', { 
@@ -64,72 +161,6 @@ const Balance = () => {
       hour: '2-digit',
       minute: '2-digit'
     }).format(date);
-  };
-  
-  const handleDeposit = () => {
-    if (!depositAmount || parseFloat(depositAmount) <= 0) {
-      toast.error("Please enter a valid amount");
-      return;
-    }
-    
-    setIsProcessing(true);
-    
-    // Simulate processing delay
-    setTimeout(() => {
-      const amount = parseFloat(depositAmount);
-      setBalance(prev => prev + amount);
-      
-      // Add to transaction history (would be handled by backend in real app)
-      const newTransaction = {
-        id: `tx-${Math.random().toString(36).substr(2, 9)}`,
-        type: "deposited",
-        amount: amount,
-        date: new Date(),
-        description: "Deposit to CodeStake wallet"
-      };
-      
-      setIsProcessing(false);
-      setIsDepositModalOpen(false);
-      setDepositAmount("");
-      
-      toast.success(`Successfully deposited ${amount} ETH`);
-    }, 2000);
-  };
-  
-  const handleWithdraw = () => {
-    if (!withdrawAmount || parseFloat(withdrawAmount) <= 0) {
-      toast.error("Please enter a valid amount");
-      return;
-    }
-    
-    const amount = parseFloat(withdrawAmount);
-    
-    if (amount > balance) {
-      toast.error("Insufficient balance");
-      return;
-    }
-    
-    setIsProcessing(true);
-    
-    // Simulate processing delay
-    setTimeout(() => {
-      setBalance(prev => prev - amount);
-      
-      // Add to transaction history (would be handled by backend in real app)
-      const newTransaction = {
-        id: `tx-${Math.random().toString(36).substr(2, 9)}`,
-        type: "withdrawn",
-        amount: amount,
-        date: new Date(),
-        description: "Withdrawal to external wallet"
-      };
-      
-      setIsProcessing(false);
-      setIsWithdrawModalOpen(false);
-      setWithdrawAmount("");
-      
-      toast.success(`Successfully withdrawn ${amount} ETH`);
-    }, 2000);
   };
   
   const getTransactionIcon = (type: string) => {
@@ -166,9 +197,38 @@ const Balance = () => {
     return type.charAt(0).toUpperCase() + type.slice(1);
   };
 
+  if (!wallet) {
+    return (
+      <div className="min-h-screen bg-web3-background">
+        <DashboardNavbar address={wallet} />
+        <main className="container mx-auto px-4 py-8 mt-16">
+          <div className="text-center">
+            <h2 className="text-2xl font-bold text-white mb-4">Please connect your wallet</h2>
+            <p className="text-white/70">Connect your wallet to view your balance and transactions</p>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-web3-background">
+        <DashboardNavbar address={wallet} />
+        <main className="container mx-auto px-4 py-8 mt-16">
+          <div className="text-center">
+            <h2 className="text-2xl font-bold text-white mb-4">Loading wallet data...</h2>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-web3-background">
-      <DashboardNavbar address="0x71C7656EC7ab88b098defB751B7401B5f6d8976F" />
+      <DashboardNavbar address={wallet} />
       
       <main className="container mx-auto px-4 py-8 mt-16">
         <h1 className="text-3xl font-bold mb-8 text-gradient">Balance & Transactions</h1>
@@ -179,7 +239,7 @@ const Balance = () => {
           <div className="relative flex flex-col md:flex-row justify-between items-center">
             <div className="mb-6 md:mb-0">
               <p className="text-white/70 mb-2">Total Balance</p>
-              <h2 className="text-4xl font-bold text-gradient mb-4">{balance.toFixed(2)} ETH</h2>
+              <h2 className="text-4xl font-bold text-gradient mb-4">{summary.balance.toFixed(2)} ETH</h2>
               
               <div className="flex gap-4">
                 <Button 
@@ -211,15 +271,15 @@ const Balance = () => {
               <div className="space-y-2">
                 <div className="flex justify-between">
                   <p className="text-white/70">Available Balance:</p>
-                  <p className="text-white font-medium">{balance.toFixed(2)} ETH</p>
+                  <p className="text-white font-medium">{summary.balance.toFixed(2)} ETH</p>
                 </div>
                 <div className="flex justify-between">
                   <p className="text-white/70">Total Earned:</p>
-                  <p className="text-white font-medium">0.15 ETH</p>
+                  <p className="text-white font-medium">{summary.totalEarned.toFixed(2)} ETH</p>
                 </div>
                 <div className="flex justify-between">
                   <p className="text-white/70">Total Staked:</p>
-                  <p className="text-white font-medium">0.75 ETH</p>
+                  <p className="text-white font-medium">{summary.totalStaked.toFixed(2)} ETH</p>
                 </div>
               </div>
             </div>
@@ -235,7 +295,7 @@ const Balance = () => {
           </CardHeader>
           <CardContent>
             <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2">
-              {transactionHistory.map((transaction) => (
+              {transactions.map((transaction) => (
                 <div 
                   key={transaction.id}
                   className="flex items-start p-4 rounded-lg border border-white/10 hover:bg-white/5 transition-colors"
@@ -381,7 +441,7 @@ const Balance = () => {
                     className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-web3-blue/50"
                     disabled={isProcessing}
                     min="0"
-                    max={balance}
+                    max={summary.balance}
                     step="0.01"
                   />
                   <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-white/50">
@@ -389,7 +449,7 @@ const Balance = () => {
                   </div>
                 </div>
                 <p className="text-sm text-white/50 mt-1">
-                  Available: {balance.toFixed(2)} ETH
+                  Available: {summary.balance.toFixed(2)} ETH
                 </p>
               </div>
               
@@ -411,7 +471,7 @@ const Balance = () => {
                 <Button
                   variant="glass"
                   onClick={handleWithdraw}
-                  disabled={isProcessing || !withdrawAmount || parseFloat(withdrawAmount) > balance}
+                  disabled={isProcessing || !withdrawAmount || parseFloat(withdrawAmount) > summary.balance}
                   className="min-w-[100px]"
                 >
                   {isProcessing ? (

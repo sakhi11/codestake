@@ -11,103 +11,87 @@ import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Progress } from "@/components/ui/progress";
 import QuizModal from "@/components/quiz/QuizModal";
+import { useWeb3 } from "@/context/Web3Provider";
+import { ethers } from "ethers";
 
-const getChallengeData = (id: string) => {
-  return {
-    id,
-    name: id === "ch-01" ? "Solidity Masters - Group 3" : "JavaScript Challenge - Advanced",
-    stakedAmount: id === "ch-01" ? 0.75 : 0.7,
-    startDate: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), // 7 days ago
-    endDate: new Date(Date.now() + 21 * 24 * 60 * 60 * 1000), // 21 days from now
-    participants: [
-      { address: "0x71C7656EC7ab88b098defB751B7401B5f6d8976F", avatar: "/placeholder.svg" },
-      { address: "0x8626f6940E2eb28930eFb4CeF49B2d1F2C9C1199", avatar: "/placeholder.svg" },
-      { address: id === "ch-01" ? "0xdD2FD4581271e230360230F9337D5c0430Bf44C0" : "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC", avatar: "/placeholder.svg" }
-    ],
-    track: id === "ch-01" ? "Solidity" : "JavaScript",
-    milestones: [
+// Contract configuration
+const CONTRACT_ADDRESS = "YOUR_CONTRACT_ADDRESS";
+const ABI = [
+  {
+    "inputs": [{ "name": "challengeId", "type": "uint256" }],
+    "name": "getChallengeDetails",
+    "outputs": [
       {
-        id: "m1",
-        name: `${id === "ch-01" ? "Solidity" : "JavaScript"} Fundamentals`,
-        unlockDate: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000), // 3 days ago (unlocked)
-        reward: id === "ch-01" ? 0.15 : 0.14,
-        isUnlocked: true,
-        isCompleted: true,
-        firstCompletedBy: {
-          address: "0x71C7656EC7ab88b098defB751B7401B5f6d8976F",
-          timestamp: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000) // completed 2 days ago
-        }
-      },
-      {
-        id: "m2",
-        name: `${id === "ch-01" ? "Smart Contract" : "Advanced Functions"}`,
-        unlockDate: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000), // yesterday (unlocked)
-        reward: id === "ch-01" ? 0.15 : 0.14,
-        isUnlocked: true,
-        isCompleted: false,
-        firstCompletedBy: null
-      },
-      {
-        id: "m3",
-        name: `${id === "ch-01" ? "Security & Auditing" : "Async JavaScript"}`,
-        unlockDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000), // 5 days from now (locked)
-        reward: id === "ch-01" ? 0.15 : 0.14,
-        isUnlocked: false,
-        isCompleted: false,
-        firstCompletedBy: null
-      },
-      {
-        id: "m4",
-        name: `${id === "ch-01" ? "Advanced Patterns" : "ES6+ Features"}`,
-        unlockDate: new Date(Date.now() + 12 * 24 * 60 * 60 * 1000), // 12 days from now (locked)
-        reward: id === "ch-01" ? 0.15 : 0.14,
-        isUnlocked: false,
-        isCompleted: false,
-        firstCompletedBy: null
-      },
-      {
-        id: "m5",
-        name: "Final Project",
-        unlockDate: new Date(Date.now() + 19 * 24 * 60 * 60 * 1000), // 19 days from now (locked)
-        reward: id === "ch-01" ? 0.15 : 0.14,
-        isUnlocked: false,
-        isCompleted: false,
-        firstCompletedBy: null
+        "components": [
+          { "name": "name", "type": "string" },
+          { "name": "stakedAmount", "type": "uint256" },
+          { "name": "startDate", "type": "uint256" },
+          { "name": "endDate", "type": "uint256" },
+          { "name": "participants", "type": "address[]" },
+          { "name": "track", "type": "string" },
+          { "name": "isActive", "type": "bool" }
+        ],
+        "name": "",
+        "type": "tuple"
       }
     ],
-    activityLog: [
-      {
-        action: "milestone_completed",
-        milestone: "m1",
-        user: "0x71C7656EC7ab88b098defB751B7401B5f6d8976F",
-        timestamp: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
-        reward: id === "ch-01" ? 0.15 : 0.14
-      },
-      {
-        action: "milestone_unlocked",
-        milestone: "m2",
-        timestamp: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000)
-      },
-      {
-        action: "user_joined",
-        user: "0x8626f6940E2eb28930eFb4CeF49B2d1F2C9C1199",
-        timestamp: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000)
-      },
-      {
-        action: "challenge_started",
-        timestamp: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
-      }
-    ]
-  };
-};
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "name": "challengeId", "type": "uint256" },
+      { "name": "milestoneId", "type": "uint256" }
+    ],
+    "name": "completeMilestone",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  }
+  // Add other necessary contract functions
+];
+
+interface Challenge {
+  id: string;
+  name: string;
+  stakedAmount: number;
+  startDate: Date;
+  endDate: Date;
+  participants: Array<{
+    address: string;
+    avatar: string;
+  }>;
+  track: string;
+  milestones: Array<{
+    id: string;
+    name: string;
+    unlockDate: Date;
+    reward: number;
+    isUnlocked: boolean;
+    isCompleted: boolean;
+    firstCompletedBy: {
+      address: string;
+      timestamp: Date;
+    } | null;
+  }>;
+  activityLog: Array<{
+    action: string;
+    milestone?: string;
+    user?: string;
+    timestamp: Date;
+    reward?: number;
+  }>;
+}
 
 const ChallengeDashboard = () => {
   const { id } = useParams<{ id: string }>();
-  const [challenge, setChallenge] = useState(getChallengeData(id || "ch-01"));
+  const { wallet, contract } = useWeb3();
+  const [challenge, setChallenge] = useState<Challenge | null>(null);
   const [expandedMilestone, setExpandedMilestone] = useState<string | null>(null);
   const [confetti, setConfetti] = useState(false);
   const [quizModalOpen, setQuizModalOpen] = useState(false);
   const [currentMilestone, setCurrentMilestone] = useState<{id: string; name: string; reward: number} | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   
   const formatDate = (date: Date) => {
     return new Intl.DateTimeFormat('en-US', { 
@@ -123,12 +107,12 @@ const ChallengeDashboard = () => {
   };
   
   const calculateProgress = () => {
-    const completedMilestones = challenge.milestones.filter(m => m.isCompleted).length;
-    return (completedMilestones / challenge.milestones.length) * 100;
+    const completedMilestones = challenge?.milestones.filter(m => m.isCompleted).length || 0;
+    return (completedMilestones / challenge?.milestones.length) * 100;
   };
   
   const handleAttemptQuiz = (milestoneId: string) => {
-    const milestone = challenge.milestones.find(m => m.id === milestoneId);
+    const milestone = challenge?.milestones.find(m => m.id === milestoneId);
     if (!milestone) return;
     
     if (!milestone.isUnlocked) {
@@ -150,60 +134,39 @@ const ChallengeDashboard = () => {
     setExpandedMilestone(null);
   };
   
-  const handleQuizComplete = (passed: boolean) => {
-    if (!currentMilestone) return;
-    
+  const handleQuizComplete = async (passed: boolean) => {
+    if (!currentMilestone || !challenge || !contract) return;
+
     if (!passed) {
       toast.error("You didn't pass the quiz. Try again later!");
       return;
     }
-    
-    const milestone = challenge.milestones.find(m => m.id === currentMilestone.id);
-    if (!milestone) return;
-    
-    const isFirst = !milestone.firstCompletedBy;
-    
-    const updatedMilestones = challenge.milestones.map(m => {
-      if (m.id === currentMilestone.id) {
-        return {
-          ...m,
-          isCompleted: true,
-          firstCompletedBy: isFirst ? {
-            address: "0x71C7656EC7ab88b098defB751B7401B5f6d8976F",
-            timestamp: new Date()
-          } : m.firstCompletedBy
-        };
-      }
-      return m;
-    });
-    
-    const updatedLogs = [
-      {
-        action: "milestone_completed",
-        milestone: currentMilestone.id,
-        user: "0x71C7656EC7ab88b098defB751B7401B5f6d8976F",
-        timestamp: new Date(),
-        reward: isFirst ? milestone.reward : 0
-      },
-      ...challenge.activityLog
-    ];
-    
-    setChallenge({
-      ...challenge,
-      milestones: updatedMilestones,
-      activityLog: updatedLogs
-    });
-    
-    if (isFirst) {
+
+    try {
+      const tx = await contract.completeMilestone(
+        challenge.id,
+        currentMilestone.id,
+        { gasLimit: 300000 }
+      );
+      
+      toast.loading("Submitting milestone completion...");
+      await tx.wait();
+
+      // Refresh challenge data
+      await fetchChallengeData();
+      
       setConfetti(true);
-      toast.success(`Congratulations! You're the first to complete this milestone and won ${milestone.reward} ETH!`);
+      toast.success("Milestone completed successfully!");
       
       setTimeout(() => {
         setConfetti(false);
       }, 4000);
-    } else {
-      toast.success("Milestone marked as completed!");
+    } catch (error: any) {
+      console.error("Error completing milestone:", error);
+      toast.error(error.reason || "Failed to complete milestone");
     }
+
+    setQuizModalOpen(false);
   };
   
   const getTimeUntilUnlock = (date: Date) => {
@@ -222,6 +185,95 @@ const ChallengeDashboard = () => {
       return `${hours}h ${minutes}m`;
     }
   };
+
+  useEffect(() => {
+    if (contract && id) {
+      fetchChallengeData();
+    }
+  }, [contract, id]);
+
+  const fetchChallengeData = async () => {
+    try {
+      setIsLoading(true);
+      const challengeData = await contract.getChallengeDetails(id);
+      
+      // Transform contract data to match our interface
+      const transformedChallenge: Challenge = {
+        id,
+        name: challengeData.name,
+        stakedAmount: Number(ethers.formatEther(challengeData.stakedAmount)),
+        startDate: new Date(Number(challengeData.startDate) * 1000),
+        endDate: new Date(Number(challengeData.endDate) * 1000),
+        participants: challengeData.participants.map((addr: string) => ({
+          address: addr,
+          avatar: "/placeholder.svg" // You might want to fetch avatars from a service
+        })),
+        track: challengeData.track,
+        milestones: await fetchMilestones(id),
+        activityLog: await fetchActivityLog(id)
+      };
+
+      setChallenge(transformedChallenge);
+    } catch (error) {
+      console.error("Error fetching challenge:", error);
+      toast.error("Failed to load challenge data");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const fetchMilestones = async (challengeId: string) => {
+    try {
+      const milestones = await contract.getChallengeMilestones(challengeId);
+      return milestones.map((m: any) => ({
+        id: m.id.toString(),
+        name: m.name,
+        unlockDate: new Date(Number(m.unlockDate) * 1000),
+        reward: Number(ethers.formatEther(m.reward)),
+        isUnlocked: m.isUnlocked,
+        isCompleted: m.isCompleted,
+        firstCompletedBy: m.firstCompletedBy.address !== ethers.ZeroAddress ? {
+          address: m.firstCompletedBy.address,
+          timestamp: new Date(Number(m.firstCompletedBy.timestamp) * 1000)
+        } : null
+      }));
+    } catch (error) {
+      console.error("Error fetching milestones:", error);
+      return [];
+    }
+  };
+
+  const fetchActivityLog = async (challengeId: string) => {
+    try {
+      const logs = await contract.getChallengeActivityLog(challengeId);
+      return logs.map((log: any) => ({
+        action: log.action,
+        milestone: log.milestone,
+        user: log.user,
+        timestamp: new Date(Number(log.timestamp) * 1000),
+        reward: log.reward ? Number(ethers.formatEther(log.reward)) : undefined
+      }));
+    } catch (error) {
+      console.error("Error fetching activity log:", error);
+      return [];
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-web3-background flex items-center justify-center">
+        <div className="text-white">Loading challenge data...</div>
+      </div>
+    );
+  }
+
+  if (!challenge) {
+    return (
+      <div className="min-h-screen bg-web3-background flex items-center justify-center">
+        <div className="text-white">Challenge not found</div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-web3-background">
@@ -487,12 +539,12 @@ const ChallengeDashboard = () => {
                   <span key={index} className="mx-6 text-white/80">
                     {activity.action === 'milestone_completed' && (
                       <>
-                        <span className="text-web3-success">@{formatAddress(activity.user)}</span> completed Milestone {activity.milestone.replace('m', '')} and won <span className="text-web3-orange">{activity.reward} ETH</span>!
+                        <span className="text-web3-success">@{formatAddress(activity.user)}</span> completed Milestone {activity.milestone?.replace('m', '')} and won <span className="text-web3-orange">{activity.reward} ETH</span>!
                       </>
                     )}
                     {activity.action === 'milestone_unlocked' && (
                       <>
-                        <span className="text-web3-blue">Milestone {activity.milestone.replace('m', '')}</span> is now unlocked! Who will complete it first?
+                        <span className="text-web3-blue">Milestone {activity.milestone?.replace('m', '')}</span> is now unlocked! Who will complete it first?
                       </>
                     )}
                     {activity.action === 'user_joined' && (
@@ -524,12 +576,12 @@ const ChallengeDashboard = () => {
                       <div>
                         {activity.action === 'milestone_completed' && (
                           <p className="text-white">
-                            <span className="text-web3-success font-medium">@{formatAddress(activity.user)}</span> completed Milestone {activity.milestone.replace('m', '')}
+                            <span className="text-web3-success font-medium">@{formatAddress(activity.user)}</span> completed Milestone {activity.milestone?.replace('m', '')}
                           </p>
                         )}
                         {activity.action === 'milestone_unlocked' && (
                           <p className="text-white">
-                            <span className="text-web3-blue font-medium">Milestone {activity.milestone.replace('m', '')}</span> is now unlocked
+                            <span className="text-web3-blue font-medium">Milestone {activity.milestone?.replace('m', '')}</span> is now unlocked
                           </p>
                         )}
                         {activity.action === 'user_joined' && (
@@ -546,7 +598,7 @@ const ChallengeDashboard = () => {
                       <p className="text-white/50 text-sm">{formatDate(activity.timestamp)}</p>
                     </div>
                     
-                    {activity.action === 'milestone_completed' && activity.reward > 0 && (
+                    {activity.action === 'milestone_completed' && activity.reward && (
                       <p className="text-sm text-white/70 mt-1">
                         Rewarded with <span className="text-web3-orange">{activity.reward} ETH</span> for first completion!
                       </p>
