@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState } from "react";
-import { Button } from "../ui/Button";
-import { LogOut, Menu, User, X } from "lucide-react";
+import { Button } from "../ui/button";
+import { LogOut, Menu, User, X, Wallet } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Link } from "react-router-dom";
 
@@ -12,6 +12,8 @@ interface DashboardNavbarProps {
 const DashboardNavbar = ({ address }: DashboardNavbarProps) => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  // Hardcoded balance for demo purposes
+  const [balance, setBalance] = useState(1.25);
   
   // Format wallet address for display (0x71C7...976F)
   const formatAddress = (address: string) => {
@@ -47,14 +49,15 @@ const DashboardNavbar = ({ address }: DashboardNavbarProps) => {
             <Link to="/dashboard" className="text-white hover:text-white transition-colors">
               Dashboard
             </Link>
-            <Link to="/challenges" className="text-white/80 hover:text-white transition-colors">
-              My Challenges
-            </Link>
-            <Link to="/rewards" className="text-white/80 hover:text-white transition-colors">
-              Rewards
-            </Link>
             
             <div className="flex items-center ml-4">
+              {/* Balance Section */}
+              <Link to="/balance" className="flex items-center mr-4 glassmorphism px-3 py-1.5 rounded-full hover:bg-white/5 transition-colors">
+                <Wallet className="h-4 w-4 mr-2 text-web3-orange" />
+                <span className="text-sm text-white/90">{balance.toFixed(2)} ETH</span>
+              </Link>
+              
+              {/* User Address */}
               <div className="flex items-center mr-4 glassmorphism px-3 py-1.5 rounded-full">
                 <User className="h-4 w-4 mr-2 text-web3-blue" />
                 <span className="text-sm text-white/90">{formatAddress(address)}</span>
@@ -92,19 +95,15 @@ const DashboardNavbar = ({ address }: DashboardNavbarProps) => {
             >
               Dashboard
             </Link>
+            
+            {/* Balance Link (Mobile) */}
             <Link
-              to="/challenges"
-              className="py-3 text-white/80 hover:text-white transition-colors"
+              to="/balance"
+              className="py-3 flex items-center text-white/80 hover:text-white transition-colors"
               onClick={() => setMobileMenuOpen(false)}
             >
-              My Challenges
-            </Link>
-            <Link
-              to="/rewards"
-              className="py-3 text-white/80 hover:text-white transition-colors"
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              Rewards
+              <Wallet className="h-4 w-4 mr-2 text-web3-orange" />
+              Balance: {balance.toFixed(2)} ETH
             </Link>
             
             <div className="mt-3 glassmorphism px-3 py-2 rounded-full inline-flex items-center self-start">

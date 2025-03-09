@@ -1,7 +1,7 @@
 
 import React, { useState } from "react";
 import { X, CheckCircle, AlertTriangle, Clock, Code } from "lucide-react";
-import { Button } from "@/components/ui/Button";
+import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import CodeEditor from "./CodeEditor";
 
@@ -311,38 +311,6 @@ function getQuizData(track: string, milestoneId: string) {
   // Extract milestone number
   const milestoneNumber = parseInt(milestoneId.replace('m', ''));
   
-  // Default quiz structure
-  const defaultQuiz = {
-    mcqs: [
-      {
-        question: "What is the correct way to declare a variable in this language?",
-        options: ["Option A (Correct)", "Option B", "Option C", "Option D"]
-      },
-      {
-        question: "Which statement correctly creates a function?",
-        options: ["Option A (Correct)", "Option B", "Option C", "Option D"]
-      },
-      {
-        question: "How do you properly handle asynchronous operations?",
-        options: ["Option A (Correct)", "Option B", "Option C", "Option D"]
-      },
-      {
-        question: "What is the best practice for error handling?",
-        options: ["Option A (Correct)", "Option B", "Option C", "Option D"]
-      },
-      {
-        question: "How do you optimize code performance?",
-        options: ["Option A (Correct)", "Option B", "Option C", "Option D"]
-      }
-    ],
-    codingChallenge: {
-      problem: "Default coding challenge",
-      instructions: ["Write a function", "Include proper error handling", "Return the expected result"],
-      starterCode: "// Write your code here",
-      testCases: ["test1", "test2", "test3"]
-    }
-  };
-  
   // Track-specific quiz data
   if (track.toLowerCase().includes("javascript")) {
     const jsQuizzes = [
@@ -381,10 +349,60 @@ function getQuizData(track: string, milestoneId: string) {
           testCases: ["findMax([1, 3, 5, 2, 9, 7]) should return 9"]
         }
       },
-      // More milestones would be defined here...
+      // Milestone 2: Advanced Functions
+      {
+        mcqs: [
+          {
+            question: "What is a closure in JavaScript?",
+            options: [
+              "A function that has access to variables in its outer lexical environment",
+              "A function that cannot access global variables",
+              "A method to close a browser window",
+              "A way to end a loop early"
+            ]
+          },
+          {
+            question: "Which method creates a new array with the results of calling a function for every array element?",
+            options: ["map()", "forEach()", "filter()", "reduce()"]
+          },
+          {
+            question: "What is the output of: (function(x) { return x * x; })(4)",
+            options: ["16", "4", "Error", "undefined"]
+          },
+          {
+            question: "Which statement about arrow functions is true?",
+            options: [
+              "Arrow functions do not have their own 'this' context",
+              "Arrow functions can always be used as constructors",
+              "Arrow functions always need curly braces",
+              "Arrow functions must contain a return statement"
+            ]
+          },
+          {
+            question: "What will 'this' refer to in a simple function call like: function test() { console.log(this); }; test();",
+            options: [
+              "The global object (window in browsers)",
+              "The function itself",
+              "undefined",
+              "null"
+            ]
+          }
+        ],
+        codingChallenge: {
+          problem: "Implement a debounce function",
+          instructions: [
+            "Create a function named 'debounce' that takes a function and a delay time as parameters",
+            "The debounce function should return a new function that will only execute after the specified delay",
+            "If the function is called again before the delay has passed, the timer should reset"
+          ],
+          starterCode: "function debounce(func, delay) {\n  // Write your code here\n}",
+          testCases: ["The function should only execute once if called multiple times within the delay period"]
+        }
+      },
+      // Additional milestones would be defined here...
     ];
     
-    return milestoneNumber <= jsQuizzes.length ? jsQuizzes[milestoneNumber - 1] : defaultQuiz;
+    return milestoneNumber <= jsQuizzes.length ? jsQuizzes[milestoneNumber - 1] : jsQuizzes[0];
   }
   else if (track.toLowerCase().includes("solidity")) {
     const solidityQuizzes = [
@@ -429,14 +447,106 @@ function getQuizData(track: string, milestoneId: string) {
           starterCode: "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\ncontract SimpleToken {\n  // Write your code here\n}",
           testCases: ["Contract should compile without errors"]
         }
+      },
+      // Milestone 2: Smart Contracts
+      {
+        mcqs: [
+          {
+            question: "What is the gas limit in a transaction used for?",
+            options: [
+              "To set the maximum amount of computational work the transaction can use",
+              "To set the transaction fee paid to miners",
+              "To limit how much ether can be sent",
+              "To restrict who can call the function"
+            ]
+          },
+          {
+            question: "Which function modifier restricts a function to only be called by the contract owner?",
+            options: [
+              "onlyOwner", 
+              "restricted", 
+              "ownerOnly", 
+              "adminOnly"
+            ]
+          },
+          {
+            question: "What happens when a transaction runs out of gas?",
+            options: [
+              "The transaction reverts but the gas is consumed",
+              "The transaction continues with limited functionality",
+              "The transaction pauses until more gas is provided",
+              "The contract self-destructs for safety"
+            ]
+          },
+          {
+            question: "Which ERC standard is used for fungible tokens like ERC-20?",
+            options: [
+              "ERC-20",
+              "ERC-721",
+              "ERC-1155",
+              "ERC-777"
+            ]
+          },
+          {
+            question: "What is the difference between 'memory' and 'storage' in Solidity?",
+            options: [
+              "Storage is persistent between function calls, memory is temporary",
+              "Memory is persistent, storage is temporary",
+              "Storage is faster, memory is slower",
+              "There is no difference, they're interchangeable"
+            ]
+          }
+        ],
+        codingChallenge: {
+          problem: "Create a simple crowdfunding contract",
+          instructions: [
+            "Create a contract named 'Crowdfunding'",
+            "Add a public address variable 'owner'",
+            "Add a public uint256 variable 'goal'",
+            "Add a public uint256 variable 'deadline' (timestamp)",
+            "Implement a 'donate()' function that accepts ETH",
+            "Implement a 'withdraw()' function that only the owner can call after the deadline"
+          ],
+          starterCode: "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\ncontract Crowdfunding {\n  // Write your code here\n}",
+          testCases: ["Contract should compile without errors"]
+        }
       }
     ];
     
-    return milestoneNumber <= solidityQuizzes.length ? solidityQuizzes[milestoneNumber - 1] : defaultQuiz;
+    return milestoneNumber <= solidityQuizzes.length ? solidityQuizzes[milestoneNumber - 1] : solidityQuizzes[0];
   }
   
-  // Return default quiz for other tracks
-  return defaultQuiz;
+  // Default quiz structure
+  return {
+    mcqs: [
+      {
+        question: "What is the correct way to declare a variable in this language?",
+        options: ["Option A (Correct)", "Option B", "Option C", "Option D"]
+      },
+      {
+        question: "Which statement correctly creates a function?",
+        options: ["Option A (Correct)", "Option B", "Option C", "Option D"]
+      },
+      {
+        question: "How do you properly handle asynchronous operations?",
+        options: ["Option A (Correct)", "Option B", "Option C", "Option D"]
+      },
+      {
+        question: "What is the best practice for error handling?",
+        options: ["Option A (Correct)", "Option B", "Option C", "Option D"]
+      },
+      {
+        question: "How do you optimize code performance?",
+        options: ["Option A (Correct)", "Option B", "Option C", "Option D"]
+      }
+    ],
+    codingChallenge: {
+      problem: "Default coding challenge",
+      instructions: ["Write a function", "Include proper error handling", "Return the expected result"],
+      starterCode: "// Write your code here",
+      testCases: ["test1", "test2", "test3"]
+    }
+  };
 }
 
 export default QuizModal;
