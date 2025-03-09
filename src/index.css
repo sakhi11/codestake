@@ -113,6 +113,43 @@
   .animate-on-scroll.animated {
     @apply opacity-100 translate-y-0;
   }
+  
+  .animate-confetti {
+    animation: confetti 4s ease-in-out forwards;
+  }
+  
+  .animate-move-background {
+    animation: move-background 20s linear infinite;
+  }
+}
+
+@keyframes confetti {
+  0% { 
+    background-image: radial-gradient(circle, #FFD700 10%, transparent 10%),
+                     radial-gradient(circle, #4A90E2 15%, transparent 15%),
+                     radial-gradient(circle, #F8A100 7%, transparent 7%),
+                     radial-gradient(circle, #00FF7F 12%, transparent 12%);
+    background-size: 4% 4%;
+    background-position: 0% 0%, 5% 5%, 10% 10%, 15% 15%;
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  100% { 
+    background-image: radial-gradient(circle, #FFD700 10%, transparent 10%),
+                     radial-gradient(circle, #4A90E2 15%, transparent 15%),
+                     radial-gradient(circle, #F8A100 7%, transparent 7%),
+                     radial-gradient(circle, #00FF7F 12%, transparent 12%);
+    background-size: 4% 4%;
+    background-position: 50% 100%, 55% 105%, 60% 110%, 65% 115%;
+    opacity: 0;
+  }
+}
+
+@keyframes move-background {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
 }
 
 #root {

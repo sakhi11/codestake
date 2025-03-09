@@ -1,6 +1,6 @@
 
 import React, { useState } from "react";
-import { Button } from "@/components/ui/Button";
+import { Button } from "@/components/ui/button";
 import { PlusCircle, X } from "lucide-react";
 import { toast } from "sonner";
 
@@ -87,7 +87,7 @@ const CreateChallenge = ({ onCreateChallenge }: CreateChallengeProps) => {
   };
 
   return (
-    <section className="mb-12">
+    <section className="mb-12" id="create-challenge">
       <div className="glassmorphism border border-white/10 rounded-xl p-6 md:p-8 relative overflow-hidden">
         {/* Background pseudo-element with gradient */}
         <div className="absolute inset-0 bg-gradient-to-br from-web3-blue/5 via-transparent to-web3-orange/5 pointer-events-none"></div>
