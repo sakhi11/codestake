@@ -3,10 +3,12 @@ import React, { useEffect, useState } from "react";
 import { Button } from "../ui/button";
 import { Wallet, Menu, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useWeb3 } from "@/context/Web3Provider";
 
 const Navbar = () => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { wallet, connectWallet, isConnected } = useWeb3();
   
   useEffect(() => {
     const handleScroll = () => {
@@ -45,9 +47,9 @@ const Navbar = () => {
             <a href="#faqs" className="text-white/80 hover:text-white transition-colors">
               FAQs
             </a>
-            <Button variant="default" size="default" className="ml-4">
+            <Button variant="default" size="default" className="ml-4" onClick={connectWallet}>
               <Wallet className="mr-2 h-4 w-4" />
-              Connect Wallet
+              {wallet ? 'Connected' : 'Connect Wallet'}
             </Button>
           </nav>
           
@@ -97,9 +99,9 @@ const Navbar = () => {
             >
               FAQs
             </a>
-            <Button variant="default" size="default" className="mt-4">
+            <Button variant="default" size="default" className="mt-4" onClick={connectWallet}>
               <Wallet className="mr-2 h-4 w-4" />
-              Connect Wallet
+              {wallet ? 'Connected' : 'Connect Wallet'}
             </Button>
           </nav>
         </div>

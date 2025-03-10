@@ -1,129 +1,20 @@
+
 // Web3Provider.tsx
 'use client'; // For Next.js client-side only
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { ethers } from "ethers";
 import { toast } from 'sonner';
 
+// Using the ABI from the stake_contract.sol
 const CONTRACT_ADDRESS = "0x5b4050c163Fb24522Fa25876b8F6A983a69D9165";
 const ABI = [
-  "function getActiveChallenges() view returns (tuple(string id, string name, uint256 stakedAmount, address[] participants, uint256 nextMilestoneDate, uint256 progress, string track)[])",
-  {
-    "anonymous": false,
-    "inputs": [
-      { "indexed": false, "internalType": "uint256", "name": "challengeId", "type": "uint256" },
-      { "indexed": false, "internalType": "address", "name": "creator", "type": "address" },
-      { "indexed": false, "internalType": "address", "name": "player1", "type": "address" },
-      { "indexed": false, "internalType": "address", "name": "player2", "type": "address" },
-      { "indexed": false, "internalType": "uint256", "name": "stakeAmount", "type": "uint256" }
-    ],
-    "name": "ChallengeCreated",
-    "type": "event"
-  },
-  {
-    "inputs": [
-      { "internalType": "uint256", "name": "_challengeId", "type": "uint256" },
-      { "internalType": "uint256", "name": "_milestone", "type": "uint256" }
-    ],
-    "name": "completeMilestone",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      { "internalType": "address", "name": "_player1", "type": "address" },
-      { "internalType": "address", "name": "_player2", "type": "address" },
-      { "internalType": "uint256", "name": "_stakeAmount", "type": "uint256" }
-    ],
-    "name": "createChallenge",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      { "indexed": false, "internalType": "uint256", "name": "challengeId", "type": "uint256" },
-      { "indexed": false, "internalType": "uint256", "name": "milestone", "type": "uint256" },
-      { "indexed": false, "internalType": "address", "name": "winner", "type": "address" }
-    ],
-    "name": "MilestoneCompleted",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      { "indexed": false, "internalType": "uint256", "name": "challengeId", "type": "uint256" },
-      { "indexed": false, "internalType": "address", "name": "player", "type": "address" },
-      { "indexed": false, "internalType": "uint256", "name": "amount", "type": "uint256" }
-    ],
-    "name": "RewardWithdrawn",
-    "type": "event"
-  },
-  {
-    "inputs": [
-      { "internalType": "uint256", "name": "_challengeId", "type": "uint256" }
-    ],
-    "name": "stakeAmount",
-    "outputs": [],
-    "stateMutability": "payable",
-    "type": "function"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      { "indexed": false, "internalType": "uint256", "name": "challengeId", "type": "uint256" },
-      { "indexed": false, "internalType": "address", "name": "player", "type": "address" },
-      { "indexed": false, "internalType": "uint256", "name": "amount", "type": "uint256" }
-    ],
-    "name": "StakeDeposited",
-    "type": "event"
-  },
-  {
-    "inputs": [
-      { "internalType": "uint256", "name": "_challengeId", "type": "uint256" }
-    ],
-    "name": "withdrawFunds",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "challengeCounter",
-    "outputs": [
-      { "internalType": "uint256", "name": "", "type": "uint256" }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      { "internalType": "uint256", "name": "", "type": "uint256" }
-    ],
-    "name": "challengeExists",
-    "outputs": [
-      { "internalType": "bool", "name": "", "type": "bool" }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      { "internalType": "uint256", "name": "", "type": "uint256" }
-    ],
-    "name": "challenges",
-    "outputs": [
-      { "internalType": "address", "name": "creator", "type": "address" },
-      { "internalType": "address", "name": "player1", "type": "address" },
-      { "internalType": "address", "name": "player2", "type": "address" },
-      { "internalType": "uint256", "name": "stakedAmount", "type": "uint256" },
-      { "internalType": "uint256", "name": "totalStake", "type": "uint256" },
-      { "internalType": "bool", "name": "isActive", "type": "bool" }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  }
+  // Only include functions we'll actually use
+  "function getChallengeDetails(uint256 _challengeId) view returns (address creator, uint256 totalStake, uint256 totalPlayers, uint256 joinedCount, uint256 balance, uint256 milestoneCount)",
+  "function createChallenge(uint256 _totalStake, uint256 _totalPlayers, address[] _allowedParticipants, uint256[] _milestoneTimestamps) payable",
+  "function joinChallenge(uint256 _challengeId) payable",
+  "function setMilestoneWinner(uint256 _challengeId, uint256 _milestoneIndex, address _winner)",
+  "function withdrawRemainingBalance(uint256 _challengeId)",
+  "function challengeCounter() view returns (uint256)"
 ];
 
 interface Web3ContextType {
@@ -149,13 +40,17 @@ export const Web3Provider = ({ children }: { children: React.ReactNode }) => {
 
   useEffect(() => {
     checkConnection();
-    window.ethereum?.on('accountsChanged', handleAccountsChanged);
-    window.ethereum?.on('chainChanged', handleChainChanged);
+    
+    if (window.ethereum) {
+      // Use addEventListener instead of on for ethers v6
+      window.ethereum.on('accountsChanged', handleAccountsChanged);
+      window.ethereum.on('chainChanged', handleChainChanged);
 
-    return () => {
-      window.ethereum?.removeListener('accountsChanged', handleAccountsChanged);
-      window.ethereum?.removeListener('chainChanged', handleChainChanged);
-    };
+      return () => {
+        window.ethereum.removeListener('accountsChanged', handleAccountsChanged);
+        window.ethereum.removeListener('chainChanged', handleChainChanged);
+      };
+    }
   }, []);
 
   const checkConnection = async () => {
@@ -216,11 +111,8 @@ export const Web3Provider = ({ children }: { children: React.ReactNode }) => {
       const provider = new ethers.BrowserProvider(window.ethereum);
       const signer = await provider.getSigner();
       
-      // Replace with your contract address and ABI
-      const contractAddress = "YOUR_CONTRACT_ADDRESS";
-      const contractABI = []; // Your contract ABI
-      
-      const contract = new ethers.Contract(contractAddress, contractABI, signer);
+      // Use the CONTRACT_ADDRESS and ABI defined at the top
+      const contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
       setContract(contract);
     } catch (error) {
       console.error('Contract setup failed:', error);
