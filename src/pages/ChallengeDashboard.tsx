@@ -1,16 +1,12 @@
 import React, { useState, useEffect } from "react";
+import { useParams, Link } from "react-router-dom";
 import DashboardNavbar from "@/components/layout/DashboardNavbar";
 import Footer from "@/components/layout/Footer";
-import { 
-  Calendar, Clock, Trophy, Users, Lock, CheckCircle, 
-  AlertTriangle, BookOpen, GiftIcon, BadgeCheck
-} from "lucide-react";
-import { toast } from "sonner";
-import { useParams, Link } from "react-router-dom";
-import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Progress } from "@/components/ui/progress";
-import QuizModal from "@/components/quiz/QuizModal";
+import { Button } from "@/components/ui/button";
+import { Trophy, Clock, CheckSquare, Users, FileText, ArrowLeft } from "lucide-react";
+import { toast } from "sonner";
 import { useWeb3 } from "@/context/Web3Provider";
 import { ethers } from "ethers";
 
@@ -415,7 +411,7 @@ const ChallengeDashboard = () => {
                     
                     {milestone.firstCompletedBy ? (
                       <div className="flex items-center">
-                        <CheckCircle className="h-4 w-4 text-web3-success mr-2" />
+                        <CheckSquare className="h-4 w-4 text-web3-success mr-2" />
                         <p className="text-sm text-white/70">
                           Completed by <span className="text-white">{formatAddress(milestone.firstCompletedBy.address)}</span>
                         </p>

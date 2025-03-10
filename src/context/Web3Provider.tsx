@@ -94,9 +94,9 @@ export const Web3Provider = ({ children }: { children: React.ReactNode }) => {
       setIsConnected(true);
       await setupContract();
       toast.success('Wallet connected successfully!');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Connection failed:', error);
-      toast.error('Failed to connect wallet');
+      toast.error(`Failed to connect wallet: ${error.message || 'Unknown error'}`);
     }
   };
 
@@ -104,19 +104,32 @@ export const Web3Provider = ({ children }: { children: React.ReactNode }) => {
     setWallet(null);
     setContract(null);
     setIsConnected(false);
+    toast.info('Wallet disconnected');
   };
 
   const setupContract = async () => {
     try {
-      const provider = new ethers.BrowserProvider(window.ethereum);
-      const signer = await provider.getSigner();
+      if (!window.ethereum) {
+        console.warn('MetaMask not installed, cannot setup contract');
+        return;
+      }
       
-      // Use the CONTRACT_ADDRESS and ABI defined at the top
-      const contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
-      setContract(contract);
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      try {
+        const signer = await provider.getSigner();
+        
+        // Use the CONTRACT_ADDRESS and ABI defined at the top
+        const contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
+        setContract(contract);
+      } catch (signerError) {
+        console.error('Failed to get signer:', signerError);
+        // At least setup a read-only contract with provider
+        const contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, provider);
+        setContract(contract);
+      }
     } catch (error) {
       console.error('Contract setup failed:', error);
-      toast.error('Failed to setup contract');
+      toast.error('Failed to setup contract connection');
     }
   };
 

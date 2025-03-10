@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import DashboardNavbar from "@/components/layout/DashboardNavbar";
 import WalletSummary from "@/components/dashboard/WalletSummary";
@@ -32,23 +33,6 @@ interface NewChallenge {
   player2: string;
   stakeAmount: string;
   track: string;
-}
-
-interface OngoingChallengesProps {
-  challenges: Challenge[];
-  isLoading: boolean;
-  userAddress: string;
-}
-
-interface WalletSummaryProps {
-  totalStaked: number;
-  ongoingChallenges: number;
-  totalWinnings: number;
-  milestonesCompleted: number;
-}
-
-interface CreateChallengeProps {
-  onCreateChallenge: (newChallenge: NewChallenge) => Promise<void>;
 }
 
 interface OngoingChallengeItem {
@@ -248,9 +232,7 @@ const Dashboard = () => {
         <WalletSummary />
         <CreateChallenge />
         <OngoingChallenges 
-          challenges={ongoingChallenges} 
-          isLoading={isLoading}
-          userAddress={wallet}
+          challenges={ongoingChallenges}
         />
       </main>
       <Footer />

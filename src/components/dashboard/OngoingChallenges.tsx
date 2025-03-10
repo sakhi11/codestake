@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Trophy, Clock, Users, ArrowRight } from "lucide-react";
 import { Link } from "react-router-dom";
+import { toast } from "sonner";
 
 // Smart Contract Info (Replace with your actual contract details)
 const CONTRACT_ADDRESS = "0x5b4050c163Fb24522Fa25876b8F6A983a69D9165"; // Replace with your deployed contract address
@@ -288,14 +289,21 @@ interface OngoingChallengesProps {
 }
 
 const OngoingChallenges = ({ challenges: propChallenges }: OngoingChallengesProps) => {
-  const [challenges, setChallenges] = useState<Challenge[]>(propChallenges);
+  const [challenges, setChallenges] = useState<Challenge[]>(propChallenges || []);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch challenges when component mounts
+  // Use the challenges from props when they change
   useEffect(() => {
-    fetchChallenges();
-  }, []);
+    if (propChallenges && propChallenges.length > 0) {
+      setChallenges(propChallenges);
+      setLoading(false);
+      setError(null);
+    } else {
+      // If no challenges in props, try to fetch them
+      fetchChallenges();
+    }
+  }, [propChallenges]);
 
   const fetchChallenges = async () => {
     setLoading(true);
@@ -316,41 +324,58 @@ const OngoingChallenges = ({ challenges: propChallenges }: OngoingChallengesProp
         const userAddress = await signer.getAddress();
         const contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, provider);
 
-        // Fetch active challenges from the smart contract
-        const challengeData = await contract.getActiveChallenges();
-        
-        if (!challengeData || !Array.isArray(challengeData)) {
-          console.error("Invalid challenge data format:", challengeData);
-          throw new Error("Failed to fetch challenges: Invalid data format");
-        }
+        try {
+          // Fetch active challenges from the smart contract
+          const challengeData = await contract.getActiveChallenges();
+          
+          if (!challengeData || !Array.isArray(challengeData)) {
+            console.error("Invalid challenge data format:", challengeData);
+            // Don't throw - we'll use placeholder data instead
+            setChallenges([]);
+            return;
+          }
 
-        // Format the data and filter for user's participation
-        const formattedChallenges = challengeData
-          .filter((c: any) => c.participants && Array.isArray(c.participants) && c.participants.includes(userAddress))
-          .map((c: any) => ({
-            id: c.id?.toString() || "0",
-            name: c.name || `Challenge ${c.id || 0}`,
-            stakedAmount: Number(ethers.formatEther(c.stakedAmount || 0)),
-            participants: (c.participants || []).map((p: string) => ({
-              address: p,
-              avatar: `https://robohash.org/${p}.png`,
-            })),
-            nextMilestoneDate: new Date(Number(c.nextMilestoneDate || Date.now()) * 1000),
-            progress: Number(c.progress || 0),
-            track: c.track || "Unknown",
-          }));
+          // Format the data and filter for user's participation
+          const formattedChallenges = challengeData
+            .filter((c: any) => c.participants && Array.isArray(c.participants) && c.participants.includes(userAddress))
+            .map((c: any) => ({
+              id: c.id?.toString() || "0",
+              name: c.name || `Challenge ${c.id || 0}`,
+              stakedAmount: Number(ethers.formatEther(c.stakedAmount || 0)),
+              participants: (c.participants || []).map((p: string) => ({
+                address: p,
+                avatar: `https://robohash.org/${p}.png`,
+              })),
+              nextMilestoneDate: new Date(Number(c.nextMilestoneDate || Date.now()) * 1000),
+              progress: Number(c.progress || 0),
+              track: c.track || "Unknown",
+            }));
 
-        setChallenges(formattedChallenges);
-      } catch (contractErr: any) {
-        console.error("Contract interaction error:", contractErr);
-        if (contractErr.code === "BAD_DATA") {
-          throw new Error("Contract returned invalid data. Please check if you're connected to the correct network.");
+          setChallenges(formattedChallenges);
+        } catch (contractErr: any) {
+          console.error("Contract interaction error:", contractErr);
+          // Just use what we have from props, don't throw
+          if (propChallenges && propChallenges.length > 0) {
+            setChallenges(propChallenges);
+          } else {
+            setChallenges([]);
+          }
         }
-        throw new Error(`Contract error: ${contractErr.message || "Failed to fetch challenges"}`);
+      } catch (signerErr) {
+        console.error("Signer error:", signerErr);
+        if (propChallenges && propChallenges.length > 0) {
+          setChallenges(propChallenges);
+        } else {
+          setChallenges([]);
+        }
       }
     } catch (err: any) {
       console.error("Error fetching challenges:", err);
       setError(err.message || "Failed to fetch challenges. Check wallet and network connection.");
+      // Still use props if available
+      if (propChallenges && propChallenges.length > 0) {
+        setChallenges(propChallenges);
+      }
     } finally {
       setLoading(false);
     }
