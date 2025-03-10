@@ -45,7 +45,7 @@ const Navbar = () => {
             <a href="#faqs" className="text-white/80 hover:text-white transition-colors">
               FAQs
             </a>
-            <Button variant="gradient" size="md" className="ml-4">
+            <Button variant="default" size="default" className="ml-4">
               <Wallet className="mr-2 h-4 w-4" />
               Connect Wallet
             </Button>
@@ -97,7 +97,7 @@ const Navbar = () => {
             >
               FAQs
             </a>
-            <Button variant="gradient" size="md" className="mt-4">
+            <Button variant="default" size="default" className="mt-4">
               <Wallet className="mr-2 h-4 w-4" />
               Connect Wallet
             </Button>
