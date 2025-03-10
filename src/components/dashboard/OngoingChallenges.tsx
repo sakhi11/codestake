@@ -1,6 +1,7 @@
+
 import React, { useEffect, useState } from "react";
 import { ethers } from "ethers";
-import { Card, CardContent } from "@/components/ui/Card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Trophy, Clock, Users, ArrowRight } from "lucide-react";
@@ -310,7 +311,7 @@ const OngoingChallenges = ({ challenges: propChallenges }: OngoingChallengesProp
       
       try {
         // Request wallet connection
-        await provider.send("eth_requestAccounts", []);
+        await window.ethereum.request({ method: 'eth_requestAccounts' });
         const signer = await provider.getSigner();
         const userAddress = await signer.getAddress();
         const contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, provider);

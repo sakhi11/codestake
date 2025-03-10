@@ -1,7 +1,8 @@
+
 import React, { useState } from "react";
 import { ethers } from "ethers";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
-import { Button } from "@/components/ui/Button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -388,13 +389,13 @@ const CreateChallenge = () => {
       }
 
       // Connect to wallet and get signer
-      const provider = new ethers.providers.Web3Provider(window.ethereum);
-      await provider.send("eth_requestAccounts", []); // Request wallet connection
-      const signer = provider.getSigner();
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      await window.ethereum.request({ method: 'eth_requestAccounts' }); // Request wallet connection
+      const signer = await provider.getSigner();
       const contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
 
       // Convert stake amount to wei
-      const stakeInWei = ethers.utils.parseEther(stakeAmount);
+      const stakeInWei = ethers.parseEther(stakeAmount);
 
       // Filter out empty participants and ensure unique addresses
       const validParticipants = [...new Set(participants.filter(p => p))];

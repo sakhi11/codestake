@@ -40,9 +40,34 @@ interface OngoingChallengesProps {
   userAddress: string;
 }
 
+interface WalletSummaryProps {
+  totalStaked: number;
+  ongoingChallenges: number;
+  totalWinnings: number;
+  milestonesCompleted: number;
+}
+
+interface CreateChallengeProps {
+  onCreateChallenge: (newChallenge: NewChallenge) => Promise<void>;
+}
+
+interface OngoingChallengeItem {
+  id: string;
+  name: string;
+  stakedAmount: number;
+  participants: {
+    address: string;
+    avatar: string;
+  }[];
+  nextMilestoneDate: Date;
+  progress: number;
+  track: string;
+}
+
 const Dashboard = () => {
   const { wallet, contract, isConnected } = useWeb3();
   const [challenges, setChallenges] = useState<Challenge[]>([]);
+  const [ongoingChallenges, setOngoingChallenges] = useState<OngoingChallengeItem[]>([]);
   const [summary, setSummary] = useState<WalletSummary>({
     totalStaked: 0,
     ongoingChallenges: 0,
@@ -74,11 +99,9 @@ const Dashboard = () => {
 
     setIsLoading(true);
     try {
-      // Get challenge count from contract
       const challengeCount = await contract.challengeCounter();
       const fetchedChallenges: Challenge[] = [];
 
-      // Fetch challenges in parallel for better performance
       const challengePromises = Array.from({ length: Number(challengeCount) }, (_, i) =>
         fetchChallengeDetails(i)
       );
@@ -86,7 +109,6 @@ const Dashboard = () => {
       const resolvedChallenges = await Promise.all(challengePromises);
       setChallenges(resolvedChallenges.filter(Boolean) as Challenge[]);
 
-      // Calculate summary
       updateSummary(resolvedChallenges.filter(Boolean) as Challenge[]);
     } catch (error) {
       console.error("Error fetching challenges:", error);
@@ -130,13 +152,38 @@ const Dashboard = () => {
       {
         totalStaked: 0,
         ongoingChallenges: 0,
-        totalWinnings: 0, // Will be updated when contract provides this info
-        milestonesCompleted: 0, // Will be updated when contract provides this info
+        totalWinnings: 0,
+        milestonesCompleted: 0,
       }
     );
 
     setSummary(summary);
   };
+
+  useEffect(() => {
+    if (challenges.length > 0) {
+      const convertedChallenges = challenges.map(challenge => ({
+        id: challenge.id,
+        name: `Challenge ${challenge.id}`,
+        stakedAmount: challenge.stakedAmount,
+        participants: [
+          {
+            address: challenge.player1,
+            avatar: `https://robohash.org/${challenge.player1}.png`,
+          },
+          {
+            address: challenge.player2,
+            avatar: `https://robohash.org/${challenge.player2}.png`,
+          }
+        ],
+        nextMilestoneDate: new Date(),
+        progress: 0,
+        track: challenge.track || "General",
+      }));
+      
+      setOngoingChallenges(convertedChallenges);
+    }
+  }, [challenges]);
 
   const handleCreateChallenge = async (newChallenge: NewChallenge) => {
     if (!contract || !wallet) {
@@ -152,7 +199,6 @@ const Dashboard = () => {
     try {
       const stakeInWei = ethers.parseEther(newChallenge.stakeAmount);
       
-      // Show pending toast
       toast.loading("Creating challenge...");
 
       const tx = await contract.createChallenge(
@@ -164,12 +210,11 @@ const Dashboard = () => {
         }
       );
 
-      // Wait for transaction confirmation
       const receipt = await tx.wait();
       
       if (receipt.status === 1) {
         toast.success("Challenge created successfully!");
-        await fetchChallenges(); // Refresh challenges
+        await fetchChallenges();
       } else {
         toast.error("Transaction failed. Please try again.");
       }
@@ -200,15 +245,10 @@ const Dashboard = () => {
     <div className="min-h-screen bg-web3-background">
       <DashboardNavbar address={wallet} />
       <main className="container mx-auto px-4 py-8 mt-16">
-        <WalletSummary
-          totalStaked={summary.totalStaked}
-          ongoingChallenges={summary.ongoingChallenges}
-          totalWinnings={summary.totalWinnings}
-          milestonesCompleted={summary.milestonesCompleted}
-        />
-        <CreateChallenge onCreateChallenge={handleCreateChallenge} />
+        <WalletSummary />
+        <CreateChallenge />
         <OngoingChallenges 
-          challenges={challenges} 
+          challenges={ongoingChallenges} 
           isLoading={isLoading}
           userAddress={wallet}
         />

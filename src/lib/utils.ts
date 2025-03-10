@@ -1,4 +1,3 @@
-
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { ethers } from "ethers";
@@ -37,9 +36,6 @@ export async function getContract() {
   const signer = await connectWallet();
   return new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
 }
-
-// The following functions would need to be updated to match your actual contract
-// Since we don't have a matching contract, we'll provide placeholder implementations
 
 // Fetch User Balance (Total Staked)
 export async function getUserBalance(userAddress: string): Promise<number> {

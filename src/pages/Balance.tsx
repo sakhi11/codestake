@@ -1,19 +1,23 @@
 import React, { useState, useEffect } from "react";
-import DashboardNavbar from "@/components/layout/DashboardNavbar";
-import Footer from "@/components/layout/Footer";
-import { 
-  ArrowDownCircle, ArrowUpCircle, Clock, DollarSign, 
-  Wallet, X, Download, Upload
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { 
-  Card, CardContent, CardDescription, 
-  CardHeader, CardTitle 
-} from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
-import { toast } from "sonner";
 import { useWeb3 } from "@/context/Web3Provider";
 import { ethers } from "ethers";
+import { toast } from "sonner";
+import { 
+  ChevronDown, 
+  ChevronUp, 
+  ArrowUpRight, 
+  ArrowDownLeft,
+  Wallet,
+  Clock,
+  Filter
+} from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import DashboardNavbar from "@/components/layout/DashboardNavbar";
+import Footer from "@/components/layout/Footer";
 
 interface Transaction {
   id: string;
