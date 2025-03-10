@@ -23,6 +23,7 @@ interface Web3ContextType {
   isConnected: boolean;
   connectWallet: () => Promise<void>;
   disconnectWallet: () => void;
+  getCurrentChainId: () => Promise<string | null>;
 }
 
 const Web3Context = createContext<Web3ContextType>({
@@ -31,6 +32,7 @@ const Web3Context = createContext<Web3ContextType>({
   isConnected: false,
   connectWallet: async () => {},
   disconnectWallet: () => {},
+  getCurrentChainId: async () => null,
 });
 
 export const Web3Provider = ({ children }: { children: React.ReactNode }) => {
@@ -80,6 +82,17 @@ export const Web3Provider = ({ children }: { children: React.ReactNode }) => {
 
   const handleChainChanged = () => {
     window.location.reload();
+  };
+
+  const getCurrentChainId = async (): Promise<string | null> => {
+    try {
+      if (!window.ethereum) return null;
+      const chainId = await window.ethereum.request({ method: 'eth_chainId' });
+      return chainId;
+    } catch (error) {
+      console.error('Error getting chain ID:', error);
+      return null;
+    }
   };
 
   const connectWallet = async () => {
@@ -134,7 +147,14 @@ export const Web3Provider = ({ children }: { children: React.ReactNode }) => {
   };
 
   return (
-    <Web3Context.Provider value={{ wallet, contract, isConnected, connectWallet, disconnectWallet }}>
+    <Web3Context.Provider value={{ 
+      wallet, 
+      contract, 
+      isConnected, 
+      connectWallet, 
+      disconnectWallet,
+      getCurrentChainId
+    }}>
       {children}
     </Web3Context.Provider>
   );

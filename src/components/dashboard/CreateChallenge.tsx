@@ -12,7 +12,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { PlusCircle, Sparkles, Users, BookOpen } from "lucide-react";
+import { PlusCircle, Sparkles, Users, BookOpen, Calendar } from "lucide-react";
+import { useWeb3 } from "@/context/Web3Provider";
+import { toast } from "sonner";
 
 // Track options for the challenge
 const TRACKS = [
@@ -23,248 +25,8 @@ const TRACKS = [
   { id: "react", name: "React" },
 ];
 
-// Smart Contract Info (Replace with your actual contract details)
-const CONTRACT_ADDRESS = "0x5b4050c163Fb24522Fa25876b8F6A983a69D9165"; // Replace with your deployed contract address
-const ABI = [
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "stakeAmount",
-        "type": "uint256"
-      },
-      {
-        "internalType": "address[]",
-        "name": "participants",
-        "type": "address[]"
-      },
-      {
-        "internalType": "string",
-        "name": "track",
-        "type": "string"
-      }
-    ],
-    "name": "createChallenge",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "payable",
-    "type": "function"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "challengeId",
-        "type": "uint256"
-      },
-      {
-        "indexed": false,
-        "internalType": "address",
-        "name": "creator",
-        "type": "address"
-      },
-      {
-        "indexed": false,
-        "internalType": "address",
-        "name": "player1",
-        "type": "address"
-      },
-      {
-        "indexed": false,
-        "internalType": "address",
-        "name": "player2",
-        "type": "address"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "stakeAmount",
-        "type": "uint256"
-      }
-    ],
-    "name": "ChallengeCreated",
-    "type": "event"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "_challengeId",
-        "type": "uint256"
-      },
-      {
-        "internalType": "uint256",
-        "name": "_milestone",
-        "type": "uint256"
-      }
-    ],
-    "name": "completeMilestone",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "challengeId",
-        "type": "uint256"
-      },
-      {
-        "indexed": false,
-        "internalType": "address",
-        "name": "player",
-        "type": "address"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "amount",
-        "type": "uint256"
-      }
-    ],
-    "name": "RewardWithdrawn",
-    "type": "event"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "_challengeId",
-        "type": "uint256"
-      }
-    ],
-    "name": "stakeAmount",
-    "outputs": [],
-    "stateMutability": "payable",
-    "type": "function"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "challengeId",
-        "type": "uint256"
-      },
-      {
-        "indexed": false,
-        "internalType": "address",
-        "name": "player",
-        "type": "address"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "amount",
-        "type": "uint256"
-      }
-    ],
-    "name": "StakeDeposited",
-    "type": "event"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "_challengeId",
-        "type": "uint256"
-      }
-    ],
-    "name": "withdrawFunds",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "challengeCounter",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "name": "challengeExists",
-    "outputs": [
-      {
-        "internalType": "bool",
-        "name": "",
-        "type": "bool"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "name": "challenges",
-    "outputs": [
-      {
-        "internalType": "address",
-        "name": "creator",
-        "type": "address"
-      },
-      {
-        "internalType": "address",
-        "name": "player1",
-        "type": "address"
-      },
-      {
-        "internalType": "address",
-        "name": "player2",
-        "type": "address"
-      },
-      {
-        "internalType": "uint256",
-        "name": "stakedAmount",
-        "type": "uint256"
-      },
-      {
-        "internalType": "uint256",
-        "name": "totalStake",
-        "type": "uint256"
-      },
-      {
-        "internalType": "bool",
-        "name": "isActive",
-        "type": "bool"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  }
-];
-
 const CreateChallenge = () => {
+  const { contract, wallet } = useWeb3();
   const [isExpanded, setIsExpanded] = useState(false);
   const [stakeAmount, setStakeAmount] = useState("");
   const [participants, setParticipants] = useState<string[]>([""]); // Initial empty participant
@@ -388,39 +150,65 @@ const CreateChallenge = () => {
         throw new Error("No wallet found. Please install MetaMask.");
       }
 
-      // Connect to wallet and get signer
-      const provider = new ethers.BrowserProvider(window.ethereum);
-      await window.ethereum.request({ method: 'eth_requestAccounts' }); // Request wallet connection
-      const signer = await provider.getSigner();
-      const contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
+      if (!contract) {
+        throw new Error("Contract not initialized. Please reconnect your wallet.");
+      }
 
       // Convert stake amount to wei
       const stakeInWei = ethers.parseEther(stakeAmount);
 
       // Filter out empty participants and ensure unique addresses
       const validParticipants = [...new Set(participants.filter(p => p))];
+      
+      // Set total players to the count of participants
+      const totalPlayers = validParticipants.length;
+      
+      // Create milestone timestamps (for simplicity, just using future timestamps)
+      const now = Math.floor(Date.now() / 1000);
+      const milestoneTimestamps = [
+        now + 86400, // 1 day from now
+        now + 172800, // 2 days from now
+        now + 259200, // 3 days from now
+      ];
 
-      // Call the smart contract to create the challenge
-      const tx = await contract.createChallenge(
-        stakeInWei,
-        validParticipants,
-        selectedTrack,
-        { value: stakeInWei } // Send ETH with the transaction
-      );
+      toast.loading("Creating challenge...");
 
-      // Wait for transaction confirmation
-      const receipt = await tx.wait();
-      console.log("Challenge created successfully. Tx hash:", receipt.transactionHash);
+      try {
+        // Call the contract function that matches our ABI definition
+        const tx = await contract.createChallenge(
+          stakeInWei, 
+          totalPlayers,
+          validParticipants, 
+          milestoneTimestamps,
+          { value: stakeInWei } // Send ETH with the transaction
+        );
 
-      // Reset form and collapse on success
-      resetForm();
-      setIsExpanded(false);
+        toast.loading("Waiting for transaction confirmation...");
+        const receipt = await tx.wait();
+        
+        toast.success("Challenge created successfully!");
+        console.log("Challenge created successfully. Tx hash:", receipt.hash);
+
+        // Reset form and collapse on success
+        resetForm();
+        setIsExpanded(false);
+      } catch (contractError: any) {
+        console.error("Contract interaction error:", contractError);
+        
+        // More informative error message
+        if (contractError.code === 'CALL_EXCEPTION') {
+          if (contractError.reason) {
+            toast.error(`Smart contract error: ${contractError.reason}`);
+          } else {
+            toast.error("Transaction failed. The contract rejected the operation. Please check your parameters and network.");
+          }
+        } else {
+          toast.error(contractError.message || "Failed to create challenge");
+        }
+      }
     } catch (error: any) {
       console.error("Error creating challenge:", error);
-      setErrors({
-        ...errors,
-        stakeAmount: error.message || "Failed to create challenge. Check wallet and network.",
-      });
+      toast.error(error.message || "Failed to create challenge");
     } finally {
       setIsSubmitting(false);
     }

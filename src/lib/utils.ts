@@ -1,11 +1,17 @@
+
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { ethers } from "ethers";
 
-// Smart Contract Details (Replace with Your Contract Address & ABI)
+// Smart Contract Details - using our ABI from the Web3Provider
 const CONTRACT_ADDRESS = "0x5b4050c163Fb24522Fa25876b8F6A983a69D9165";
 const CONTRACT_ABI = [
-  // Add your smart contract ABI here
+  "function getChallengeDetails(uint256 _challengeId) view returns (address creator, uint256 totalStake, uint256 totalPlayers, uint256 joinedCount, uint256 balance, uint256 milestoneCount)",
+  "function createChallenge(uint256 _totalStake, uint256 _totalPlayers, address[] _allowedParticipants, uint256[] _milestoneTimestamps) payable",
+  "function joinChallenge(uint256 _challengeId) payable",
+  "function setMilestoneWinner(uint256 _challengeId, uint256 _milestoneIndex, address _winner)",
+  "function withdrawRemainingBalance(uint256 _challengeId)",
+  "function challengeCounter() view returns (uint256)"
 ];
 
 // Classname utility function (for Tailwind)
@@ -19,13 +25,34 @@ export function shortenAddress(address: string, chars = 4): string {
   return `${address.substring(0, chars + 2)}...${address.substring(42 - chars)}`;
 }
 
+// Function to check if MetaMask is installed
+export function isMetaMaskInstalled(): boolean {
+  return typeof window !== 'undefined' && !!window.ethereum;
+}
+
+// Function to check current network
+export async function getCurrentChainId(): Promise<string | null> {
+  if (!isMetaMaskInstalled()) return null;
+  try {
+    return await window.ethereum.request({ method: 'eth_chainId' });
+  } catch (error) {
+    console.error('Error getting chain ID:', error);
+    return null;
+  }
+}
+
 // Function to Connect Wallet
 export async function connectWallet() {
   if (window.ethereum) {
-    const provider = new ethers.BrowserProvider(window.ethereum);
-    await window.ethereum.request({ method: "eth_requestAccounts" });
-    const signer = await provider.getSigner();
-    return signer;
+    try {
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      await window.ethereum.request({ method: "eth_requestAccounts" });
+      const signer = await provider.getSigner();
+      return signer;
+    } catch (error) {
+      console.error('Error connecting wallet:', error);
+      throw error;
+    }
   } else {
     throw new Error("MetaMask not installed");
   }
@@ -33,13 +60,19 @@ export async function connectWallet() {
 
 // Get Smart Contract Instance
 export async function getContract() {
-  const signer = await connectWallet();
-  return new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
+  try {
+    const signer = await connectWallet();
+    return new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
+  } catch (error) {
+    console.error('Error getting contract:', error);
+    throw error;
+  }
 }
 
 // Fetch User Balance (Total Staked)
 export async function getUserBalance(userAddress: string): Promise<number> {
   try {
+    if (!isMetaMaskInstalled()) return 0;
     const provider = new ethers.BrowserProvider(window.ethereum);
     const balance = await provider.getBalance(userAddress);
     return Number(ethers.formatEther(balance));
@@ -49,34 +82,28 @@ export async function getUserBalance(userAddress: string): Promise<number> {
   }
 }
 
-// Fetch Challenges for Logged-in Wallet
-export async function getUserChallenges(userAddress: string) {
-  // This would need to match your contract's actual function
-  // Placeholder implementation
-  return [];
-}
-
-// Join Challenge by Staking
-export async function joinChallenge(challengeId: number, stakeAmount: number) {
-  const contract = await getContract();
-  const tx = await contract.joinChallenge(challengeId, { 
-    value: ethers.parseEther(stakeAmount.toString()) 
-  });
-  await tx.wait();
-}
-
-// Mark Milestone as Completed
-export async function completeMilestone(challengeId: number, milestoneIndex: number) {
-  const contract = await getContract();
-  const signer = await connectWallet();
-  const address = await signer.getAddress();
-  const tx = await contract.setMilestoneWinner(challengeId, milestoneIndex, address);
-  await tx.wait();
-}
-
-// Withdraw Remaining Balance After Challenge Ends
-export async function withdrawBalance(challengeId: number) {
-  const contract = await getContract();
-  const tx = await contract.withdrawRemainingBalance(challengeId);
-  await tx.wait();
+// Helper for error handling in contract calls
+export function handleContractError(error: any): string {
+  console.error('Contract error:', error);
+  
+  if (error.code === 'CALL_EXCEPTION') {
+    if (error.reason) {
+      return `Smart contract error: ${error.reason}`;
+    } else {
+      return "Transaction failed. The contract rejected the operation.";
+    }
+  }
+  
+  if (error.message) {
+    // Clean up common error messages
+    if (error.message.includes('user rejected')) {
+      return "Transaction was rejected by the user.";
+    }
+    if (error.message.includes('insufficient funds')) {
+      return "Insufficient funds for transaction.";
+    }
+    return error.message;
+  }
+  
+  return "An unknown error occurred.";
 }
