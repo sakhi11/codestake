@@ -17,6 +17,14 @@ const ABI = [
   "function challengeCounter() view returns (uint256)"
 ];
 
+// Networks supported by the contract
+const SUPPORTED_NETWORKS = {
+  '0x1': 'Ethereum Mainnet',
+  '0x5': 'Goerli Testnet',
+  '0x13881': 'Mumbai Testnet',
+  '0xaa36a7': 'Sepolia Testnet'
+};
+
 interface Web3ContextType {
   wallet: string | null;
   contract: any | null;
@@ -24,6 +32,7 @@ interface Web3ContextType {
   connectWallet: () => Promise<void>;
   disconnectWallet: () => void;
   getCurrentChainId: () => Promise<string | null>;
+  checkNetworkSupport: () => Promise<boolean>;
 }
 
 const Web3Context = createContext<Web3ContextType>({
@@ -33,6 +42,7 @@ const Web3Context = createContext<Web3ContextType>({
   connectWallet: async () => {},
   disconnectWallet: () => {},
   getCurrentChainId: async () => null,
+  checkNetworkSupport: async () => false,
 });
 
 export const Web3Provider = ({ children }: { children: React.ReactNode }) => {
@@ -94,6 +104,12 @@ export const Web3Provider = ({ children }: { children: React.ReactNode }) => {
       return null;
     }
   };
+  
+  const checkNetworkSupport = async (): Promise<boolean> => {
+    const chainId = await getCurrentChainId();
+    if (!chainId) return false;
+    return !!SUPPORTED_NETWORKS[chainId as keyof typeof SUPPORTED_NETWORKS];
+  };
 
   const connectWallet = async () => {
     try {
@@ -106,10 +122,21 @@ export const Web3Provider = ({ children }: { children: React.ReactNode }) => {
       setWallet(accounts[0]);
       setIsConnected(true);
       await setupContract();
-      toast.success('Wallet connected successfully!');
+      
+      // Check if we're on a supported network
+      const isNetworkSupported = await checkNetworkSupport();
+      if (!isNetworkSupported) {
+        toast.warning('You are connected to an unsupported network. Some features may not work correctly.');
+      } else {
+        toast.success('Wallet connected successfully!');
+      }
     } catch (error: any) {
       console.error('Connection failed:', error);
-      toast.error(`Failed to connect wallet: ${error.message || 'Unknown error'}`);
+      if (error.code === 4001) {
+        toast.error('Connection rejected. Please approve the connection request in your wallet.');
+      } else {
+        toast.error(`Failed to connect wallet: ${error.message || 'Unknown error'}`);
+      }
     }
   };
 
@@ -153,7 +180,8 @@ export const Web3Provider = ({ children }: { children: React.ReactNode }) => {
       isConnected, 
       connectWallet, 
       disconnectWallet,
-      getCurrentChainId
+      getCurrentChainId,
+      checkNetworkSupport
     }}>
       {children}
     </Web3Context.Provider>

@@ -86,24 +86,40 @@ export async function getUserBalance(userAddress: string): Promise<number> {
 export function handleContractError(error: any): string {
   console.error('Contract error:', error);
   
+  // Network related errors
+  if (error.code === 'NETWORK_ERROR') {
+    return "Network error. Please check your connection and try again.";
+  }
+  
+  // User rejected transaction
+  if (error.code === 4001 || (error.message && error.message.includes('user rejected'))) {
+    return "Transaction was rejected in your wallet.";
+  }
+  
+  // Insufficient funds
+  if (error.message && error.message.includes('insufficient funds')) {
+    return "Insufficient funds for this transaction.";
+  }
+
+  // Gas estimation failures often indicate contract-level issues
+  if (error.message && error.message.includes('estimate gas')) {
+    return "Transaction would fail. The contract is rejecting this operation. Possible reasons: incorrect parameters, insufficient allowance, or contract restrictions.";
+  }
+  
+  // CALL_EXCEPTION typically means the contract function reverted
   if (error.code === 'CALL_EXCEPTION') {
     if (error.reason) {
       return `Smart contract error: ${error.reason}`;
-    } else {
-      return "Transaction failed. The contract rejected the operation.";
+    } 
+    
+    // Missing revert data errors
+    if (error.message && error.message.includes('missing revert data')) {
+      return "Transaction would fail. Please check that you're connected to the correct network and that your parameters are valid.";
     }
+    
+    return "The smart contract rejected this operation. Please verify your inputs and try again.";
   }
   
-  if (error.message) {
-    // Clean up common error messages
-    if (error.message.includes('user rejected')) {
-      return "Transaction was rejected by the user.";
-    }
-    if (error.message.includes('insufficient funds')) {
-      return "Insufficient funds for transaction.";
-    }
-    return error.message;
-  }
-  
-  return "An unknown error occurred.";
+  // Default fallback
+  return error.message || "An unknown error occurred.";
 }

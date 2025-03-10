@@ -1,5 +1,5 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { ethers } from "ethers";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,7 @@ import {
 import { PlusCircle, Sparkles, Users, BookOpen, Calendar } from "lucide-react";
 import { useWeb3 } from "@/context/Web3Provider";
 import { toast } from "sonner";
+import { getCurrentChainId, handleContractError } from "@/lib/utils";
 
 // Track options for the challenge
 const TRACKS = [
@@ -25,8 +26,16 @@ const TRACKS = [
   { id: "react", name: "React" },
 ];
 
+// Networks supported by the contract
+const SUPPORTED_NETWORKS = {
+  '0x1': 'Ethereum Mainnet',
+  '0x5': 'Goerli Testnet',
+  '0x13881': 'Mumbai Testnet',
+  '0xaa36a7': 'Sepolia Testnet'
+};
+
 const CreateChallenge = () => {
-  const { contract, wallet } = useWeb3();
+  const { contract, wallet, isConnected } = useWeb3();
   const [isExpanded, setIsExpanded] = useState(false);
   const [stakeAmount, setStakeAmount] = useState("");
   const [participants, setParticipants] = useState<string[]>([""]); // Initial empty participant
@@ -37,6 +46,23 @@ const CreateChallenge = () => {
     track: "",
   });
   const [isSubmitting, setIsSubmitting] = useState(false); // Track submission status
+  const [networkError, setNetworkError] = useState<string | null>(null);
+
+  // Check if we're on the correct network on component mount and when wallet changes
+  useEffect(() => {
+    const checkNetwork = async () => {
+      if (isConnected) {
+        const chainId = await getCurrentChainId();
+        if (chainId && !SUPPORTED_NETWORKS[chainId as keyof typeof SUPPORTED_NETWORKS]) {
+          setNetworkError(`Please connect to a supported network. Current network is not supported.`);
+        } else {
+          setNetworkError(null);
+        }
+      }
+    };
+    
+    checkNetwork();
+  }, [isConnected, wallet]);
 
   // Toggle the form visibility
   const toggleForm = () => {
@@ -142,6 +168,13 @@ const CreateChallenge = () => {
   // Handle form submission with blockchain interaction
   const handleSubmit = async () => {
     if (!validateForm()) return;
+    
+    // Check network before proceeding
+    const chainId = await getCurrentChainId();
+    if (chainId && !SUPPORTED_NETWORKS[chainId as keyof typeof SUPPORTED_NETWORKS]) {
+      toast.error(`Please connect to a supported network. Current network is not supported.`);
+      return;
+    }
 
     setIsSubmitting(true);
 
@@ -160,7 +193,7 @@ const CreateChallenge = () => {
       // Filter out empty participants and ensure unique addresses
       const validParticipants = [...new Set(participants.filter(p => p))];
       
-      // Set total players to the count of participants
+      // Set total players to the count of participants plus 1 (including the creator)
       const totalPlayers = validParticipants.length;
       
       // Create milestone timestamps (for simplicity, just using future timestamps)
@@ -173,14 +206,35 @@ const CreateChallenge = () => {
 
       toast.loading("Creating challenge...");
 
+      console.log("Calling contract with params:", {
+        stakeInWei: stakeInWei.toString(),
+        totalPlayers,
+        validParticipants,
+        milestoneTimestamps
+      });
+
       try {
-        // Call the contract function that matches our ABI definition
-        const tx = await contract.createChallenge(
+        // First check if we can estimate gas for the transaction
+        const gasEstimate = await contract.createChallenge.estimateGas(
           stakeInWei, 
           totalPlayers,
           validParticipants, 
           milestoneTimestamps,
           { value: stakeInWei } // Send ETH with the transaction
+        );
+        
+        console.log("Gas estimate:", gasEstimate.toString());
+
+        // If gas estimation succeeds, proceed with transaction
+        const tx = await contract.createChallenge(
+          stakeInWei, 
+          totalPlayers,
+          validParticipants, 
+          milestoneTimestamps,
+          { 
+            value: stakeInWei, // Send ETH with the transaction
+            gasLimit: gasEstimate.toString() // Use estimated gas
+          }
         );
 
         toast.loading("Waiting for transaction confirmation...");
@@ -195,22 +249,16 @@ const CreateChallenge = () => {
       } catch (contractError: any) {
         console.error("Contract interaction error:", contractError);
         
-        // More informative error message
-        if (contractError.code === 'CALL_EXCEPTION') {
-          if (contractError.reason) {
-            toast.error(`Smart contract error: ${contractError.reason}`);
-          } else {
-            toast.error("Transaction failed. The contract rejected the operation. Please check your parameters and network.");
-          }
-        } else {
-          toast.error(contractError.message || "Failed to create challenge");
-        }
+        // More informative error handling
+        const errorMessage = handleContractError(contractError);
+        toast.error(errorMessage);
       }
     } catch (error: any) {
       console.error("Error creating challenge:", error);
       toast.error(error.message || "Failed to create challenge");
     } finally {
       setIsSubmitting(false);
+      toast.dismiss();
     }
   };
 
@@ -238,6 +286,13 @@ const CreateChallenge = () => {
             </CardTitle>
           </CardHeader>
           <CardContent>
+            {networkError && (
+              <div className="bg-red-500/20 border border-red-500 p-3 rounded-md mb-4 text-red-200">
+                <p className="text-sm font-medium">{networkError}</p>
+                <p className="text-xs mt-1">Please switch to a supported network in your wallet.</p>
+              </div>
+            )}
+
             <div className="space-y-6">
               {/* Stake Amount */}
               <div className="space-y-2">
@@ -381,7 +436,7 @@ const CreateChallenge = () => {
                 </Button>
                 <Button
                   onClick={handleSubmit}
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || !!networkError}
                   className="relative group overflow-hidden transition-all duration-300 transform hover:scale-105 hover:shadow-[0_0_25px_rgba(248,161,0,0.3)]"
                   style={{
                     background: "linear-gradient(135deg, #4A90E2 0%, #F8A100 100%)",
