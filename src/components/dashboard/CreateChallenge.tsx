@@ -32,6 +32,23 @@ const TRACKS = [
   { id: "react", name: "React" },
 ];
 
+// Function to validate contract state before making calls
+const validateContractState = (contract) => {
+  if (!contract) {
+    return { valid: false, error: "Contract not initialized. Please reconnect your wallet." };
+  }
+  
+  // Check if createChallenge method exists on the contract
+  if (!contract.createChallenge) {
+    return { 
+      valid: false, 
+      error: "Contract method 'createChallenge' not found. Make sure you're connected to eduChain Testnet." 
+    };
+  }
+  
+  return { valid: true };
+};
+
 const CreateChallenge = () => {
   const { contract, wallet, isConnected } = useWeb3();
   const [isExpanded, setIsExpanded] = useState(false);
@@ -46,6 +63,7 @@ const CreateChallenge = () => {
   const [isSubmitting, setIsSubmitting] = useState(false); // Track submission status
   const [networkError, setNetworkError] = useState<string | null>(null);
   const [debugInfo, setDebugInfo] = useState<string | null>(null);
+  const [contractValid, setContractValid] = useState(true);
 
   // Check if we're on the correct network on component mount and when wallet changes
   useEffect(() => {
@@ -61,7 +79,16 @@ const CreateChallenge = () => {
     };
     
     checkNetwork();
-  }, [isConnected, wallet]);
+    
+    // Also validate contract when it changes
+    if (contract) {
+      const validation = validateContractState(contract);
+      setContractValid(validation.valid);
+      if (!validation.valid) {
+        setDebugInfo(validation.error);
+      }
+    }
+  }, [isConnected, wallet, contract]);
 
   // Toggle the form visibility
   const toggleForm = () => {
@@ -199,6 +226,14 @@ const CreateChallenge = () => {
       if (!switched) return;
     }
 
+    // Validate contract state
+    const contractStatus = validateContractState(contract);
+    if (!contractStatus.valid) {
+      toast.error(contractStatus.error);
+      setDebugInfo(contractStatus.error);
+      return;
+    }
+
     setIsSubmitting(true);
     setDebugInfo(null);
 
@@ -207,17 +242,13 @@ const CreateChallenge = () => {
         throw new Error("No wallet found. Please install MetaMask.");
       }
 
-      if (!contract) {
-        throw new Error("Contract not initialized. Please reconnect your wallet.");
-      }
-
       // Convert stake amount to wei - use a lower amount for testing if needed
       let stakeInWei;
       try {
         stakeInWei = ethers.parseEther(stakeAmount);
         // If the stake is too high, this can cause issues
-        if (stakeInWei > ethers.parseEther("0.1")) {
-          setDebugInfo("Warning: High stake amounts may cause transaction failures. Consider reducing the amount for testing.");
+        if (stakeInWei > ethers.parseEther("0.01")) {
+          setDebugInfo("Warning: High stake amounts may cause transaction failures. Consider using a smaller amount (0.001-0.01 EDU) for testing.");
         }
       } catch (parseError) {
         console.error("Error parsing stake amount:", parseError);
@@ -251,6 +282,8 @@ const CreateChallenge = () => {
         track: selectedTrack,
       });
       
+      console.log("Contract methods available:", Object.keys(contract));
+      
       // Use our safe contract call helper
       const result = await safeContractCall(
         contract,
@@ -262,7 +295,7 @@ const CreateChallenge = () => {
           milestoneTimestamps
         ],
         { 
-          value: stakeInWei // Send ETH with the transaction
+          value: stakeInWei // Send EDU tokens with the transaction
         }
       );
       
@@ -314,7 +347,7 @@ const CreateChallenge = () => {
         </div>
         <p className="whitespace-pre-wrap">{debugInfo}</p>
         <p className="mt-2 text-yellow-400">
-          Suggestion: Try reducing the stake amount. The contract may have limitations on transaction size.
+          Suggestion: Try reducing the stake amount to 0.001-0.01 EDU. The contract may have limitations on transaction size.
         </p>
       </div>
     );
@@ -329,7 +362,7 @@ const CreateChallenge = () => {
           Tips for Successful Transactions
         </h4>
         <ul className="text-xs text-blue-100 mt-2 space-y-1 list-disc pl-4">
-          <li>Start with small stake amounts (e.g. 0.01 ETH) for testing</li>
+          <li>Start with small stake amounts (e.g. 0.001-0.01 EDU) for testing</li>
           <li>Ensure you have enough EDU tokens for gas fees plus your stake</li>
           <li>Verify you're connected to eduChain Testnet (Chain ID: 0xa045c)</li>
           <li>Complex transactions may sometimes fail due to gas limitations</li>
@@ -370,6 +403,14 @@ const CreateChallenge = () => {
               </div>
             )}
 
+            {!contractValid && (
+              <div className="bg-red-500/20 border border-red-500 p-3 rounded-md mb-4 text-red-200">
+                <p className="text-sm font-medium">Contract initialization error</p>
+                <p className="text-xs mt-1">The contract appears to be missing required methods. Please ensure you're connected to eduChain Testnet.</p>
+                <SwitchNetworkButton />
+              </div>
+            )}
+
             {debugInfo && <DebugInfo />}
             
             <TransactionGuidance />
@@ -378,7 +419,7 @@ const CreateChallenge = () => {
               {/* Stake Amount */}
               <div className="space-y-2">
                 <Label htmlFor="stake-amount" className="text-white">
-                  Stake Amount (ETH)
+                  Stake Amount (EDU)
                 </Label>
                 <div className="relative">
                   <Input
@@ -386,7 +427,7 @@ const CreateChallenge = () => {
                     type="text"
                     value={stakeAmount}
                     onChange={(e) => setStakeAmount(e.target.value)}
-                    placeholder="0.01"
+                    placeholder="0.001"
                     disabled={isSubmitting}
                     className={`bg-web3-card border ${
                       errors.stakeAmount ? "border-web3-orange" : "border-white/10"
@@ -396,7 +437,7 @@ const CreateChallenge = () => {
                     <p className="text-web3-orange text-sm mt-1">{errors.stakeAmount}</p>
                   )}
                   <p className="text-xs text-blue-300 mt-1">
-                    Recommended: Use small amounts (0.01-0.05 ETH) for testing
+                    Recommended: Use small amounts (0.001-0.01 EDU) for testing
                   </p>
                 </div>
               </div>
@@ -520,7 +561,7 @@ const CreateChallenge = () => {
                 </Button>
                 <Button
                   onClick={handleSubmit}
-                  disabled={isSubmitting || !!networkError}
+                  disabled={isSubmitting || !!networkError || !contractValid}
                   className="relative group overflow-hidden transition-all duration-300 transform hover:scale-105 hover:shadow-[0_0_25px_rgba(248,161,0,0.3)]"
                   style={{
                     background: "linear-gradient(135deg, #4A90E2 0%, #F8A100 100%)",

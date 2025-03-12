@@ -102,6 +102,7 @@ const ChallengeDashboard = () => {
   const [isQuizModalOpen, setIsQuizModalOpen] = useState(false);
   const [selectedMilestone, setSelectedMilestone] = useState<any>(null);
   const [isOnCorrectNetwork, setIsOnCorrectNetwork] = useState(true);
+  const [contractValid, setContractValid] = useState(true);
 
   useEffect(() => {
     console.log("ChallengeDashboard - Address:", address);
@@ -120,7 +121,20 @@ const ChallengeDashboard = () => {
       }
     };
     
+    // Also check if contract has required methods
+    const validateContract = () => {
+      if (contract) {
+        console.log("Contract methods:", Object.keys(contract));
+        setContractValid(!!contract.createChallenge);
+        
+        if (!contract.createChallenge) {
+          toast.error("Contract interface incomplete. Please make sure you're on eduChain Testnet.");
+        }
+      }
+    };
+    
     checkNetwork();
+    validateContract();
   }, [address, contract, isConnected]);
 
   // When modal opens for a milestone, provide an empty onSubmit prop to satisfy the component
@@ -175,6 +189,21 @@ const ChallengeDashboard = () => {
                     size="sm"
                   >
                     Switch to eduChain Testnet
+                  </Button>
+                </div>
+              )}
+
+              {!contractValid && isOnCorrectNetwork && (
+                <div className="mt-4 p-3 bg-yellow-500/20 border border-yellow-500 rounded-md">
+                  <p className="text-yellow-200 text-sm">
+                    Contract interface appears to be incomplete. This could be due to a connection issue.
+                  </p>
+                  <Button 
+                    onClick={() => window.location.reload()}
+                    className="mt-2 bg-yellow-500 hover:bg-yellow-600 text-white text-sm"
+                    size="sm"
+                  >
+                    Refresh Page
                   </Button>
                 </div>
               )}

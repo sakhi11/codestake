@@ -71,6 +71,9 @@ export async function switchToEduChain(): Promise<boolean> {
       params: [{ chainId: EDU_CHAIN_CONFIG.chainId }]
     });
     
+    // Wait a moment for the chain to switch before checking
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
     // Verify the switch was successful
     const chainId = await getCurrentChainId();
     return chainId === EDU_CHAIN_CONFIG.chainId;
@@ -83,7 +86,10 @@ export async function switchToEduChain(): Promise<boolean> {
           params: [EDU_CHAIN_CONFIG]
         });
         
-        // Verify the network was added and switched to
+        // Wait a moment for the chain to be added before checking
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Verify we're on the right chain
         const chainId = await getCurrentChainId();
         return chainId === EDU_CHAIN_CONFIG.chainId;
       } catch (addError) {
@@ -120,11 +126,19 @@ export async function connectWallet() {
   }
 }
 
-// Get Smart Contract Instance
+// Get Smart Contract Instance with better error handling
 export async function getContract() {
   try {
     const signer = await connectWallet();
-    return new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
+    const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
+    
+    // Verify the contract has the expected methods
+    if (!contract.createChallenge) {
+      console.error("Contract missing createChallenge method!");
+      throw new Error("Contract interface is incomplete. Please check network connection.");
+    }
+    
+    return contract;
   } catch (error) {
     console.error('Error getting contract:', error);
     throw error;
@@ -153,6 +167,11 @@ export function handleContractError(error: any): string {
     console.log('Error JSON representation:', JSON.stringify(error, null, 2));
   } catch (e) {
     console.log('Error cannot be stringified:', error);
+  }
+  
+  // Contract method doesn't exist
+  if (error.message && error.message.includes("undefined") && error.message.includes("createChallenge")) {
+    return "Contract method 'createChallenge' is not available. Please make sure you're connected to eduChain Testnet (Chain ID: 0xa045c).";
   }
   
   // Check for eduChain network connection issues
@@ -195,7 +214,7 @@ export function handleContractError(error: any): string {
 
   // "Could not coalesce error" typically indicates complex issues with the transaction
   if (error.message && error.message.includes('could not coalesce error')) {
-    return "Transaction failed on the eduChain network. This could be due to gas limits, contract limitations, or network congestion. Try with a lower stake amount.";
+    return "Transaction failed on the eduChain network. Try using a much smaller stake amount (0.001-0.01 EDU).";
   }
   
   // CALL_EXCEPTION typically means the contract function reverted
@@ -224,11 +243,20 @@ export function handleContractError(error: any): string {
 // Helper function to safely estimate gas for contract calls
 export async function safelyEstimateGas(contract: ethers.Contract, method: string, args: any[], options: any = {}): Promise<{ success: boolean, gasLimit?: bigint, error?: string }> {
   try {
-    // First try to estimate the gas
+    // First check if the method exists on the contract
+    if (!contract[method]) {
+      console.error(`Method ${method} doesn't exist on contract`);
+      return {
+        success: false,
+        error: `Contract method '${method}' is not available. Please make sure you're connected to eduChain Testnet.`
+      };
+    }
+    
+    // Try to estimate the gas
     const gasEstimate = await contract.estimateGas[method](...args, options);
     
-    // Add a buffer to the gas estimate (20% more)
-    const gasLimit = gasEstimate * BigInt(120) / BigInt(100);
+    // Add a buffer to the gas estimate (30% more for eduChain)
+    const gasLimit = gasEstimate * BigInt(130) / BigInt(100);
     
     return {
       success: true,
@@ -246,6 +274,18 @@ export async function safelyEstimateGas(contract: ethers.Contract, method: strin
 // Helper function to safely execute contract calls with proper gas estimation
 export async function safeContractCall(contract: ethers.Contract, method: string, args: any[], options: any = {}): Promise<{ success: boolean, result?: any, error?: string }> {
   try {
+    // First check if the method exists on the contract
+    if (!contract[method]) {
+      console.error(`Method ${method} doesn't exist on contract`);
+      return {
+        success: false,
+        error: `Contract method '${method}' is not available. Please make sure you're connected to eduChain Testnet.`
+      };
+    }
+    
+    // Log available methods for debugging
+    console.log("Available contract methods:", Object.keys(contract));
+    
     // First, make sure we're on the right network
     const isOnCorrectNetwork = await isOnEduChain();
     if (!isOnCorrectNetwork) {
