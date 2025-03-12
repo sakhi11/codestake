@@ -1,9 +1,10 @@
+
 import React, { useEffect, useState } from "react";
 import { ethers } from "ethers";
 import { useWeb3 } from "@/context/Web3Provider";
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/Card";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/Button";
+import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import DashboardNavbar from "@/components/layout/DashboardNavbar";
 import { toast } from "sonner";
@@ -48,8 +49,10 @@ const Milestone = ({ milestone }: { milestone: MilestoneItem }) => {
         <p>{milestone.description}</p>
         <Separator className="my-2" />
         <div className="flex items-center justify-between">
-          <Calendar className="h-4 w-4 mr-2" />
-          <p className="text-sm text-muted-foreground">Due: {milestone.dueDate}</p>
+          <div className="flex items-center">
+            <Calendar className="h-4 w-4 mr-2" />
+            <p className="text-sm text-muted-foreground">Due: {milestone.dueDate}</p>
+          </div>
           {milestone.status === 'incomplete' && (
             <Badge variant="outline">Quiz Available</Badge>
           )}
@@ -98,11 +101,26 @@ const ChallengeDashboard = () => {
   ]);
   const [isQuizModalOpen, setIsQuizModalOpen] = useState(false);
   const [selectedMilestone, setSelectedMilestone] = useState<any>(null);
+  const [isOnCorrectNetwork, setIsOnCorrectNetwork] = useState(true);
 
   useEffect(() => {
     console.log("ChallengeDashboard - Address:", address);
     console.log("ChallengeDashboard - Contract:", contract);
     console.log("ChallengeDashboard - IsConnected:", isConnected);
+    
+    // Check if we're on the correct network
+    const checkNetwork = async () => {
+      if (window.ethereum) {
+        const chainId = await window.ethereum.request({ method: 'eth_chainId' });
+        setIsOnCorrectNetwork(chainId === EDU_CHAIN_CONFIG.chainId);
+        
+        if (chainId !== EDU_CHAIN_CONFIG.chainId) {
+          toast.warning(`Please switch to eduChain Testnet (Chain ID: ${EDU_CHAIN_CONFIG.chainId})`);
+        }
+      }
+    };
+    
+    checkNetwork();
   }, [address, contract, isConnected]);
 
   // When modal opens for a milestone, provide an empty onSubmit prop to satisfy the component
@@ -115,6 +133,21 @@ const ChallengeDashboard = () => {
     console.log("Quiz submitted with code:", code);
     // Implementation for quiz submission
     setIsQuizModalOpen(false);
+  };
+
+  const handleSwitchNetwork = async () => {
+    try {
+      const switched = await switchToEduChain();
+      if (switched) {
+        setIsOnCorrectNetwork(true);
+        toast.success("Successfully switched to eduChain Testnet!");
+      } else {
+        toast.error("Failed to switch networks. Please try manually in your wallet.");
+      }
+    } catch (error) {
+      console.error("Error switching network:", error);
+      toast.error("Failed to switch networks");
+    }
   };
 
   return (
@@ -130,6 +163,21 @@ const ChallengeDashboard = () => {
             </CardHeader>
             <CardContent>
               <p className="text-white/70">Track your progress and complete milestones.</p>
+              
+              {!isOnCorrectNetwork && (
+                <div className="mt-4 p-3 bg-red-500/20 border border-red-500 rounded-md">
+                  <p className="text-red-200 text-sm">
+                    You are not connected to eduChain Testnet. Some features may not work correctly.
+                  </p>
+                  <Button 
+                    onClick={handleSwitchNetwork}
+                    className="mt-2 bg-red-500 hover:bg-red-600 text-white text-sm"
+                    size="sm"
+                  >
+                    Switch to eduChain Testnet
+                  </Button>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -146,7 +194,6 @@ const ChallengeDashboard = () => {
           </div>
         </section>
         
-        {/* Add this needed prop to QuizModal */}
         {isQuizModalOpen && selectedMilestone && (
           <QuizModal 
             isOpen={isQuizModalOpen}

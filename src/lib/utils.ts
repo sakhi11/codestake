@@ -144,11 +144,18 @@ export async function getUserBalance(userAddress: string): Promise<number> {
   }
 }
 
-// Helper for error handling in contract calls
+// Enhanced error handling for contract calls with verbose logging
 export function handleContractError(error: any): string {
-  console.error('Contract error:', error);
+  console.error('Contract error details:', error);
   
-  // Network related errors - specific to eduChain
+  // For debugging purposes, log the entire error object
+  try {
+    console.log('Error JSON representation:', JSON.stringify(error, null, 2));
+  } catch (e) {
+    console.log('Error cannot be stringified:', error);
+  }
+  
+  // Check for eduChain network connection issues
   if (error.code === 'NETWORK_ERROR') {
     return "Network error. Please check your connection to eduChain Testnet and try again.";
   }
@@ -158,9 +165,22 @@ export function handleContractError(error: any): string {
     return "Transaction was rejected in your wallet.";
   }
   
+  // JSON-RPC internal errors - typically indicate network or contract issues
+  if (error.code === -32603 || (error.message && error.message.includes('Internal JSON-RPC error'))) {
+    return "Transaction failed on the eduChain network. This could be due to contract limitations or network congestion. Try reducing the stake amount or simplifying participant list.";
+  }
+
+  // Look for nonce-related errors
+  if (error.message && error.message.includes('nonce')) {
+    return "Transaction nonce issue. Please reset your wallet's transaction history or try again later.";
+  }
+  
   // Insufficient funds
-  if (error.message && error.message.includes('insufficient funds')) {
-    return "Insufficient funds for this transaction. Make sure you have enough EDU tokens.";
+  if (error.message && (
+    error.message.includes('insufficient funds') || 
+    error.message.includes('exceeds balance')
+  )) {
+    return "Insufficient funds for this transaction. Make sure you have enough EDU tokens to cover the stake amount plus gas fees.";
   }
 
   // Gas estimation failures often indicate contract-level issues
@@ -170,7 +190,12 @@ export function handleContractError(error: any): string {
   
   // "Missing revert data" errors typically indicate chain/contract mismatch
   if (error.message && error.message.includes('missing revert data')) {
-    return "Transaction failed. Please make sure you're connected to eduChain Testnet (Chain ID: 0xa045c) and try again.";
+    return "Transaction failed. Please make sure you're connected to eduChain Testnet (Chain ID: 0xa045c) and try again with a lower stake amount.";
+  }
+
+  // "Could not coalesce error" typically indicates complex issues with the transaction
+  if (error.message && error.message.includes('could not coalesce error')) {
+    return "Transaction failed on the eduChain network. This could be due to gas limits, contract limitations, or network congestion. Try with a lower stake amount.";
   }
   
   // CALL_EXCEPTION typically means the contract function reverted
@@ -184,9 +209,83 @@ export function handleContractError(error: any): string {
       return "Transaction would fail. Please verify you're connected to eduChain Testnet (Chain ID: 0xa045c) and that your parameters are valid.";
     }
     
-    return "The smart contract rejected this operation. Please verify your inputs and try again.";
+    return "The smart contract rejected this operation. Please verify your inputs and try again with a lower stake amount.";
+  }
+
+  // UNKNOWN_ERROR - could be various issues
+  if (error.code === 'UNKNOWN_ERROR') {
+    return "Unknown error occurred. This could be due to network issues or contract limitations. Try reducing the stake amount or simplifying the transaction.";
   }
   
-  // Default fallback
-  return error.message || "An unknown error occurred.";
+  // Default fallback with more details
+  return error.message || "An unknown error occurred. Please try again with a lower stake amount.";
+}
+
+// Helper function to safely estimate gas for contract calls
+export async function safelyEstimateGas(contract: ethers.Contract, method: string, args: any[], options: any = {}): Promise<{ success: boolean, gasLimit?: bigint, error?: string }> {
+  try {
+    // First try to estimate the gas
+    const gasEstimate = await contract.estimateGas[method](...args, options);
+    
+    // Add a buffer to the gas estimate (20% more)
+    const gasLimit = gasEstimate * BigInt(120) / BigInt(100);
+    
+    return {
+      success: true,
+      gasLimit
+    };
+  } catch (error: any) {
+    console.error(`Gas estimation failed for ${method}:`, error);
+    return {
+      success: false,
+      error: handleContractError(error)
+    };
+  }
+}
+
+// Helper function to safely execute contract calls with proper gas estimation
+export async function safeContractCall(contract: ethers.Contract, method: string, args: any[], options: any = {}): Promise<{ success: boolean, result?: any, error?: string }> {
+  try {
+    // First, make sure we're on the right network
+    const isOnCorrectNetwork = await isOnEduChain();
+    if (!isOnCorrectNetwork) {
+      const switched = await switchToEduChain();
+      if (!switched) {
+        return {
+          success: false,
+          error: "Failed to switch to eduChain network. Please switch manually in your wallet."
+        };
+      }
+    }
+    
+    // Try to estimate gas first
+    const gasEstimation = await safelyEstimateGas(contract, method, args, options);
+    if (!gasEstimation.success) {
+      return {
+        success: false,
+        error: gasEstimation.error
+      };
+    }
+    
+    // Adjust options with our gas estimate
+    const callOptions = {
+      ...options,
+      gasLimit: gasEstimation.gasLimit
+    };
+    
+    // Make the actual contract call
+    const tx = await contract[method](...args, callOptions);
+    const receipt = await tx.wait();
+    
+    return {
+      success: true,
+      result: receipt
+    };
+  } catch (error: any) {
+    console.error(`Contract call failed for ${method}:`, error);
+    return {
+      success: false,
+      error: handleContractError(error)
+    };
+  }
 }

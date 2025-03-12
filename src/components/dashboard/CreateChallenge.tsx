@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { ethers } from "ethers";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,10 +12,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { PlusCircle, Sparkles, Users, BookOpen, Calendar } from "lucide-react";
+import { PlusCircle, Sparkles, Users, BookOpen, Calendar, AlertCircle } from "lucide-react";
 import { useWeb3 } from "@/context/Web3Provider";
 import { toast } from "sonner";
-import { EDU_CHAIN_CONFIG, getCurrentChainId, handleContractError, switchToEduChain } from "@/lib/utils";
+import { 
+  EDU_CHAIN_CONFIG, 
+  getCurrentChainId, 
+  handleContractError, 
+  switchToEduChain,
+  safeContractCall
+} from "@/lib/utils";
 
 // Track options for the challenge
 const TRACKS = [
@@ -26,7 +33,7 @@ const TRACKS = [
 ];
 
 const CreateChallenge = () => {
-  const { contract, wallet, isConnected, getCurrentChainId: getChainIdFromContext, switchToEduChain: switchNetworkFromContext } = useWeb3();
+  const { contract, wallet, isConnected } = useWeb3();
   const [isExpanded, setIsExpanded] = useState(false);
   const [stakeAmount, setStakeAmount] = useState("");
   const [participants, setParticipants] = useState<string[]>([""]); // Initial empty participant
@@ -38,6 +45,7 @@ const CreateChallenge = () => {
   });
   const [isSubmitting, setIsSubmitting] = useState(false); // Track submission status
   const [networkError, setNetworkError] = useState<string | null>(null);
+  const [debugInfo, setDebugInfo] = useState<string | null>(null);
 
   // Check if we're on the correct network on component mount and when wallet changes
   useEffect(() => {
@@ -74,6 +82,7 @@ const CreateChallenge = () => {
       track: "",
     });
     setIsSubmitting(false);
+    setDebugInfo(null);
   };
 
   // Add a new participant input field
@@ -178,7 +187,7 @@ const CreateChallenge = () => {
     }
   };
 
-  // Handle form submission with blockchain interaction
+  // Handle form submission with blockchain interaction and better error handling
   const handleSubmit = async () => {
     if (!validateForm()) return;
     
@@ -191,6 +200,7 @@ const CreateChallenge = () => {
     }
 
     setIsSubmitting(true);
+    setDebugInfo(null);
 
     try {
       if (!window.ethereum) {
@@ -201,13 +211,25 @@ const CreateChallenge = () => {
         throw new Error("Contract not initialized. Please reconnect your wallet.");
       }
 
-      // Convert stake amount to wei
-      const stakeInWei = ethers.parseEther(stakeAmount);
+      // Convert stake amount to wei - use a lower amount for testing if needed
+      let stakeInWei;
+      try {
+        stakeInWei = ethers.parseEther(stakeAmount);
+        // If the stake is too high, this can cause issues
+        if (stakeInWei > ethers.parseEther("0.1")) {
+          setDebugInfo("Warning: High stake amounts may cause transaction failures. Consider reducing the amount for testing.");
+        }
+      } catch (parseError) {
+        console.error("Error parsing stake amount:", parseError);
+        toast.error("Invalid stake amount. Please check your input.");
+        setIsSubmitting(false);
+        return;
+      }
 
       // Filter out empty participants and ensure unique addresses
       const validParticipants = [...new Set(participants.filter(p => p))];
       
-      // Set total players to the count of participants plus 1 (including the creator)
+      // Set total players to the count of participants (already includes the creator)
       const totalPlayers = validParticipants.length;
       
       // Create milestone timestamps (for simplicity, just using future timestamps)
@@ -220,6 +242,7 @@ const CreateChallenge = () => {
 
       toast.loading("Creating challenge...");
 
+      // Debug logging
       console.log("Calling contract with params:", {
         stakeInWei: stakeInWei.toString(),
         totalPlayers,
@@ -227,46 +250,38 @@ const CreateChallenge = () => {
         milestoneTimestamps,
         track: selectedTrack,
       });
-
-      try {
-        // First check if we can estimate gas for the transaction
-        // Make sure parameters match the contract ABI exactly
-        const tx = await contract.createChallenge(
+      
+      // Use our safe contract call helper
+      const result = await safeContractCall(
+        contract,
+        "createChallenge",
+        [
           stakeInWei, 
           totalPlayers,
           validParticipants, 
-          milestoneTimestamps,
-          { 
-            value: stakeInWei, // Send ETH with the transaction
-            gasLimit: 3000000 // Use a high gas limit to ensure the transaction goes through
-          }
-        );
-
-        toast.loading("Waiting for transaction confirmation...");
-        const receipt = await tx.wait();
-        
+          milestoneTimestamps
+        ],
+        { 
+          value: stakeInWei // Send ETH with the transaction
+        }
+      );
+      
+      if (result.success) {
         toast.success("Challenge created successfully!");
-        console.log("Challenge created successfully. Tx hash:", receipt.hash);
+        console.log("Challenge created successfully. Tx hash:", result.result.hash);
 
         // Reset form and collapse on success
         resetForm();
         setIsExpanded(false);
-      } catch (contractError: any) {
-        console.error("Contract interaction error:", contractError);
-        
-        // Check if we need to switch networks
-        if (contractError.message && contractError.message.includes("missing revert data")) {
-          toast.error("Transaction would fail. Please ensure you're connected to eduChain Testnet.");
-          await handleSwitchNetwork();
-        } else {
-          // More informative error handling
-          const errorMessage = handleContractError(contractError);
-          toast.error(errorMessage);
-        }
+      } else {
+        toast.error(result.error || "Transaction failed");
+        setDebugInfo(result.error || "Unknown error occurred");
       }
     } catch (error: any) {
       console.error("Error creating challenge:", error);
-      toast.error(error.message || "Failed to create challenge");
+      const errorMessage = handleContractError(error);
+      toast.error(errorMessage);
+      setDebugInfo(errorMessage);
     } finally {
       setIsSubmitting(false);
       toast.dismiss();
@@ -284,6 +299,42 @@ const CreateChallenge = () => {
       >
         Switch to eduChain Testnet
       </Button>
+    );
+  };
+
+  // Display debug information if available
+  const DebugInfo = () => {
+    if (!debugInfo) return null;
+    
+    return (
+      <div className="bg-black/70 border border-yellow-500 p-3 rounded-md mb-4 text-yellow-200 font-mono text-xs overflow-auto max-h-[150px]">
+        <div className="flex items-center mb-2">
+          <AlertCircle className="h-4 w-4 mr-2 text-yellow-400" />
+          <h4 className="font-bold">Debug Information</h4>
+        </div>
+        <p className="whitespace-pre-wrap">{debugInfo}</p>
+        <p className="mt-2 text-yellow-400">
+          Suggestion: Try reducing the stake amount. The contract may have limitations on transaction size.
+        </p>
+      </div>
+    );
+  };
+
+  // Helper component for transaction guidance
+  const TransactionGuidance = () => {
+    return (
+      <div className="bg-blue-500/20 border border-blue-400 p-3 rounded-md mb-4">
+        <h4 className="font-semibold text-blue-200 flex items-center">
+          <Sparkles className="h-4 w-4 mr-2" />
+          Tips for Successful Transactions
+        </h4>
+        <ul className="text-xs text-blue-100 mt-2 space-y-1 list-disc pl-4">
+          <li>Start with small stake amounts (e.g. 0.01 ETH) for testing</li>
+          <li>Ensure you have enough EDU tokens for gas fees plus your stake</li>
+          <li>Verify you're connected to eduChain Testnet (Chain ID: 0xa045c)</li>
+          <li>Complex transactions may sometimes fail due to gas limitations</li>
+        </ul>
+      </div>
     );
   };
 
@@ -319,6 +370,10 @@ const CreateChallenge = () => {
               </div>
             )}
 
+            {debugInfo && <DebugInfo />}
+            
+            <TransactionGuidance />
+
             <div className="space-y-6">
               {/* Stake Amount */}
               <div className="space-y-2">
@@ -331,7 +386,7 @@ const CreateChallenge = () => {
                     type="text"
                     value={stakeAmount}
                     onChange={(e) => setStakeAmount(e.target.value)}
-                    placeholder="0.1"
+                    placeholder="0.01"
                     disabled={isSubmitting}
                     className={`bg-web3-card border ${
                       errors.stakeAmount ? "border-web3-orange" : "border-white/10"
@@ -340,6 +395,9 @@ const CreateChallenge = () => {
                   {errors.stakeAmount && (
                     <p className="text-web3-orange text-sm mt-1">{errors.stakeAmount}</p>
                   )}
+                  <p className="text-xs text-blue-300 mt-1">
+                    Recommended: Use small amounts (0.01-0.05 ETH) for testing
+                  </p>
                 </div>
               </div>
 
@@ -350,7 +408,7 @@ const CreateChallenge = () => {
                     <Users className="h-4 w-4 mr-2 text-web3-blue" />
                     Challenge Participants
                   </Label>
-                  {participants.length < 4 && (
+                  {participants.length < 2 && (
                     <Button
                       type="button"
                       variant="outline"
