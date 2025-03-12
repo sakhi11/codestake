@@ -2,9 +2,9 @@
 import React, { useEffect, useState } from "react";
 import { ethers } from "ethers";
 import { useWeb3 } from "@/context/Web3Provider";
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/ui/Button";
 import { Separator } from "@/components/ui/separator";
 import DashboardNavbar from "@/components/layout/DashboardNavbar";
 import { toast } from "sonner";

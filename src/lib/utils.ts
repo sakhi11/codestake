@@ -1,4 +1,3 @@
-
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { ethers } from "ethers";
@@ -129,13 +128,24 @@ export async function connectWallet() {
 // Get Smart Contract Instance with better error handling
 export async function getContract() {
   try {
+    // Make sure we're on eduChain first
+    const chainId = await getCurrentChainId();
+    if (chainId !== EDU_CHAIN_CONFIG.chainId) {
+      console.warn('Not on eduChain, attempting to switch...');
+      const switched = await switchToEduChain();
+      if (!switched) {
+        throw new Error('Please switch to eduChain Testnet to interact with the contract');
+      }
+    }
+
     const signer = await connectWallet();
     const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
     
-    // Verify the contract has the expected methods
-    if (!contract.createChallenge) {
-      console.error("Contract missing createChallenge method!");
-      throw new Error("Contract interface is incomplete. Please check network connection.");
+    // Verify contract methods
+    console.log('Available contract methods:', Object.keys(contract.interface.functions));
+    
+    if (!contract.interface.functions['createChallenge(uint256,uint256,address[],uint256[])']) {
+      throw new Error('Contract interface is incomplete. Please check network connection.');
     }
     
     return contract;
