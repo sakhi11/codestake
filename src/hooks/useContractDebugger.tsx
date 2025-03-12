@@ -2,135 +2,105 @@
 import { useState, useEffect } from 'react';
 import { ethers } from 'ethers';
 import { useWeb3 } from '@/context/Web3Provider';
+import { toast } from 'sonner';
+import { EDU_CHAIN_CONFIG } from '@/lib/utils';
 
 /**
- * A hook for debugging contract interactions and validating parameters
+ * A hook for debugging contract interactions
  */
 export function useContractDebugger() {
-  const { contract, wallet, isConnected } = useWeb3();
-  const [isBusy, setIsBusy] = useState(false);
-  const [lastError, setLastError] = useState<string | null>(null);
-  const [lastDebugLog, setLastDebugLog] = useState<any>(null);
+  const { wallet, contract, getCurrentChainId, switchToEduChain } = useWeb3();
+  const [isDebugMode, setIsDebugMode] = useState(false);
+  const [networkStatus, setNetworkStatus] = useState<{
+    chainId: string | null;
+    isCorrectNetwork: boolean;
+    networkName: string;
+  }>({
+    chainId: null,
+    isCorrectNetwork: false,
+    networkName: 'Unknown',
+  });
 
-  // Debug a transaction before sending it
-  const debugTransaction = async (
-    functionName: string,
+  // Check network on mount and when wallet changes
+  useEffect(() => {
+    const checkNetwork = async () => {
+      if (wallet) {
+        const chainId = await getCurrentChainId();
+        const isCorrectNetwork = chainId === EDU_CHAIN_CONFIG.chainId;
+        
+        setNetworkStatus({
+          chainId,
+          isCorrectNetwork,
+          networkName: isCorrectNetwork ? 'eduChain Testnet' : `Unknown Network (${chainId})`
+        });
+      }
+    };
+    
+    checkNetwork();
+  }, [wallet, getCurrentChainId]);
+
+  // Helper to validate and debug contract calls
+  const debugContractCall = async (
+    methodName: string,
     args: any[],
-    options: any = {}
+    options = {}
   ) => {
-    if (!contract || !isConnected) {
-      return {
-        success: false,
-        error: 'Contract or wallet not connected',
-        log: null
+    console.log(`[CONTRACT DEBUG] Calling ${methodName} with args:`, args);
+    console.log(`[CONTRACT DEBUG] Options:`, options);
+    
+    if (!contract) {
+      console.error('[CONTRACT DEBUG] No contract instance available');
+      return { success: false, error: 'No contract instance available' };
+    }
+    
+    if (!networkStatus.isCorrectNetwork) {
+      console.error(`[CONTRACT DEBUG] Wrong network. Expected ${EDU_CHAIN_CONFIG.chainId}, got ${networkStatus.chainId}`);
+      return { 
+        success: false, 
+        error: `Wrong network. Expected eduChain Testnet (${EDU_CHAIN_CONFIG.chainId}), got ${networkStatus.chainId}`,
+        needsNetworkSwitch: true 
       };
     }
-
-    setIsBusy(true);
-    setLastError(null);
     
     try {
-      // Log information for debugging
-      const debugData = {
-        function: functionName,
-        args: args.map(arg => 
-          ethers.isAddress(arg) ? arg : 
-          Array.isArray(arg) ? arg.map(a => a.toString()) : 
-          arg.toString()
-        ),
-        options: {
-          ...options,
-          value: options.value ? options.value.toString() : undefined
-        },
-        wallet,
-        contractAddress: contract.target
-      };
-      
-      console.log('Debug transaction:', debugData);
-      setLastDebugLog(debugData);
-
-      // Try to estimate gas to see if the transaction would fail
-      if (contract[functionName]) {
-        try {
-          const gasEstimate = await contract[functionName].estimateGas(
-            ...args, 
-            options
-          );
-          console.log(`Gas estimate for ${functionName}:`, gasEstimate.toString());
-          
-          return {
-            success: true,
-            gasEstimate,
-            error: null,
-            log: debugData
-          };
-        } catch (error: any) {
-          console.error(`Gas estimation failed for ${functionName}:`, error);
-          setLastError(formatError(error));
-          
-          return {
-            success: false,
-            error: formatError(error),
-            log: debugData
-          };
-        }
-      } else {
-        const error = `Function ${functionName} not found on contract`;
-        console.error(error);
-        setLastError(error);
-        
-        return {
-          success: false,
-          error,
-          log: debugData
-        };
+      // Check if method exists on contract
+      if (!contract[methodName]) {
+        console.error(`[CONTRACT DEBUG] Method ${methodName} does not exist on contract`);
+        return { success: false, error: `Method ${methodName} does not exist on contract` };
       }
-    } catch (error: any) {
-      console.error('Debug transaction error:', error);
-      const errorMessage = formatError(error);
-      setLastError(errorMessage);
       
-      return {
-        success: false,
-        error: errorMessage,
-        log: { error: error.message }
-      };
-    } finally {
-      setIsBusy(false);
+      // Print contract address and ABI
+      console.log(`[CONTRACT DEBUG] Contract address: ${contract.target}`);
+      console.log(`[CONTRACT DEBUG] Contract interface:`, contract.interface.format());
+      
+      return { success: true };
+    } catch (error) {
+      console.error(`[CONTRACT DEBUG] Error validating contract call:`, error);
+      return { success: false, error: `Error validating contract call: ${error}` };
     }
   };
 
-  // Format error messages
-  const formatError = (error: any): string => {
-    if (!error) return 'Unknown error';
-    
-    // Handle missing revert data
-    if (error.message && error.message.includes('missing revert data')) {
-      return 'Contract rejected the transaction. This could be due to incorrect parameters or incompatible contract version.';
+  // Helper to switch network if needed
+  const ensureCorrectNetwork = async (): Promise<boolean> => {
+    if (!networkStatus.isCorrectNetwork) {
+      toast.warning(`You need to be on eduChain Testnet. Attempting to switch...`);
+      return await switchToEduChain();
     }
-    
-    // Handle user rejection
-    if (error.code === 4001 || (error.message && error.message.includes('user rejected'))) {
-      return 'Transaction was rejected by the user';
-    }
-    
-    // Handle insufficient funds
-    if (error.message && error.message.includes('insufficient funds')) {
-      return 'Insufficient funds for this transaction';
-    }
-    
-    // Return the error message or code
-    return error.reason || error.message || `Error code: ${error.code}`;
+    return true;
+  };
+
+  // Toggle debug mode
+  const toggleDebugMode = () => {
+    setIsDebugMode(!isDebugMode);
   };
 
   return {
-    debugTransaction,
-    isBusy,
-    lastError,
-    lastDebugLog,
-    reset: () => {
-      setLastError(null);
-      setLastDebugLog(null);
-    }
+    isDebugMode,
+    toggleDebugMode,
+    networkStatus,
+    debugContractCall,
+    ensureCorrectNetwork
   };
 }
+
+export default useContractDebugger;

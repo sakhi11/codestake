@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { ethers } from "ethers";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,7 +14,7 @@ import {
 import { PlusCircle, Sparkles, Users, BookOpen, Calendar } from "lucide-react";
 import { useWeb3 } from "@/context/Web3Provider";
 import { toast } from "sonner";
-import { getCurrentChainId, handleContractError } from "@/lib/utils";
+import { EDU_CHAIN_CONFIG, getCurrentChainId, handleContractError, switchToEduChain } from "@/lib/utils";
 
 // Track options for the challenge
 const TRACKS = [
@@ -26,16 +25,8 @@ const TRACKS = [
   { id: "react", name: "React" },
 ];
 
-// Networks supported by the contract
-const SUPPORTED_NETWORKS = {
-  '0x1': 'Ethereum Mainnet',
-  '0x5': 'Goerli Testnet',
-  '0x13881': 'Mumbai Testnet',
-  '0xaa36a7': 'Sepolia Testnet'
-};
-
 const CreateChallenge = () => {
-  const { contract, wallet, isConnected } = useWeb3();
+  const { contract, wallet, isConnected, getCurrentChainId: getChainIdFromContext, switchToEduChain: switchNetworkFromContext } = useWeb3();
   const [isExpanded, setIsExpanded] = useState(false);
   const [stakeAmount, setStakeAmount] = useState("");
   const [participants, setParticipants] = useState<string[]>([""]); // Initial empty participant
@@ -53,8 +44,8 @@ const CreateChallenge = () => {
     const checkNetwork = async () => {
       if (isConnected) {
         const chainId = await getCurrentChainId();
-        if (chainId && !SUPPORTED_NETWORKS[chainId as keyof typeof SUPPORTED_NETWORKS]) {
-          setNetworkError(`Please connect to a supported network. Current network is not supported.`);
+        if (chainId && chainId !== EDU_CHAIN_CONFIG.chainId) {
+          setNetworkError(`Please connect to eduChain Testnet (Chain ID: ${EDU_CHAIN_CONFIG.chainId}). Current network is not supported.`);
         } else {
           setNetworkError(null);
         }
@@ -165,15 +156,38 @@ const CreateChallenge = () => {
     return valid;
   };
 
+  // Handle switching to eduChain network
+  const handleSwitchNetwork = async () => {
+    toast.loading("Switching to eduChain network...");
+    try {
+      const success = await switchToEduChain();
+      if (success) {
+        toast.success("Successfully switched to eduChain network!");
+        setNetworkError(null);
+        return true;
+      } else {
+        toast.error("Failed to switch to eduChain network");
+        return false;
+      }
+    } catch (error) {
+      console.error("Error switching network:", error);
+      toast.error("Failed to switch to eduChain network");
+      return false;
+    } finally {
+      toast.dismiss();
+    }
+  };
+
   // Handle form submission with blockchain interaction
   const handleSubmit = async () => {
     if (!validateForm()) return;
     
     // Check network before proceeding
     const chainId = await getCurrentChainId();
-    if (chainId && !SUPPORTED_NETWORKS[chainId as keyof typeof SUPPORTED_NETWORKS]) {
-      toast.error(`Please connect to a supported network. Current network is not supported.`);
-      return;
+    if (chainId && chainId !== EDU_CHAIN_CONFIG.chainId) {
+      toast.error(`Please connect to eduChain Testnet (Chain ID: ${EDU_CHAIN_CONFIG.chainId})`);
+      const switched = await handleSwitchNetwork();
+      if (!switched) return;
     }
 
     setIsSubmitting(true);
@@ -210,22 +224,13 @@ const CreateChallenge = () => {
         stakeInWei: stakeInWei.toString(),
         totalPlayers,
         validParticipants,
-        milestoneTimestamps
+        milestoneTimestamps,
+        track: selectedTrack,
       });
 
       try {
         // First check if we can estimate gas for the transaction
-        const gasEstimate = await contract.createChallenge.estimateGas(
-          stakeInWei, 
-          totalPlayers,
-          validParticipants, 
-          milestoneTimestamps,
-          { value: stakeInWei } // Send ETH with the transaction
-        );
-        
-        console.log("Gas estimate:", gasEstimate.toString());
-
-        // If gas estimation succeeds, proceed with transaction
+        // Make sure parameters match the contract ABI exactly
         const tx = await contract.createChallenge(
           stakeInWei, 
           totalPlayers,
@@ -233,7 +238,7 @@ const CreateChallenge = () => {
           milestoneTimestamps,
           { 
             value: stakeInWei, // Send ETH with the transaction
-            gasLimit: gasEstimate.toString() // Use estimated gas
+            gasLimit: 3000000 // Use a high gas limit to ensure the transaction goes through
           }
         );
 
@@ -249,9 +254,15 @@ const CreateChallenge = () => {
       } catch (contractError: any) {
         console.error("Contract interaction error:", contractError);
         
-        // More informative error handling
-        const errorMessage = handleContractError(contractError);
-        toast.error(errorMessage);
+        // Check if we need to switch networks
+        if (contractError.message && contractError.message.includes("missing revert data")) {
+          toast.error("Transaction would fail. Please ensure you're connected to eduChain Testnet.");
+          await handleSwitchNetwork();
+        } else {
+          // More informative error handling
+          const errorMessage = handleContractError(contractError);
+          toast.error(errorMessage);
+        }
       }
     } catch (error: any) {
       console.error("Error creating challenge:", error);
@@ -260,6 +271,20 @@ const CreateChallenge = () => {
       setIsSubmitting(false);
       toast.dismiss();
     }
+  };
+
+  // Create a button to switch networks if needed
+  const SwitchNetworkButton = () => {
+    if (!networkError) return null;
+    
+    return (
+      <Button 
+        onClick={handleSwitchNetwork}
+        className="mt-2 w-full bg-red-500 hover:bg-red-600"
+      >
+        Switch to eduChain Testnet
+      </Button>
+    );
   };
 
   return (
@@ -289,7 +314,8 @@ const CreateChallenge = () => {
             {networkError && (
               <div className="bg-red-500/20 border border-red-500 p-3 rounded-md mb-4 text-red-200">
                 <p className="text-sm font-medium">{networkError}</p>
-                <p className="text-xs mt-1">Please switch to a supported network in your wallet.</p>
+                <p className="text-xs mt-1">Please switch to eduChain Testnet in your wallet.</p>
+                <SwitchNetworkButton />
               </div>
             )}
 

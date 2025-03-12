@@ -4,6 +4,7 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { ethers } from "ethers";
 import { toast } from 'sonner';
+import { EDU_CHAIN_CONFIG } from "@/lib/utils";
 
 // Using the ABI from the stake_contract.sol
 const CONTRACT_ADDRESS = "0x5b4050c163Fb24522Fa25876b8F6A983a69D9165";
@@ -17,26 +18,9 @@ const ABI = [
   "function challengeCounter() view returns (uint256)"
 ];
 
-// Networks supported by the contract
+// Networks supported by the contract - we're only supporting eduChain now
 const SUPPORTED_NETWORKS = {
   '0xa045c': 'eduChain Testnet', // eduChain Testnet - 656476 in decimal
-  '0x1': 'Ethereum Mainnet',
-  '0x5': 'Goerli Testnet',
-  '0x13881': 'Mumbai Testnet',
-  '0xaa36a7': 'Sepolia Testnet'
-};
-
-// eduChain Testnet configuration
-const EDU_CHAIN_CONFIG = {
-  chainId: '0xa045c', // 656476 in decimal
-  chainName: 'eduChain Testnet',
-  nativeCurrency: {
-    name: 'EDU',
-    symbol: 'EDU',
-    decimals: 18
-  },
-  rpcUrls: ['https://open-campus-codex-sepolia.drpc.org'],
-  blockExplorerUrls: ['https://explorer.edu.ooo/']
 };
 
 interface Web3ContextType {
@@ -106,8 +90,18 @@ export const Web3Provider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  const handleChainChanged = () => {
-    window.location.reload();
+  const handleChainChanged = async (chainId: string) => {
+    // Instead of reloading the page, check if the chain is supported
+    console.log("Chain changed to:", chainId);
+    
+    if (chainId !== EDU_CHAIN_CONFIG.chainId) {
+      toast.warning("You are connected to an unsupported network. Please switch to eduChain Testnet.");
+      await switchToEduChain();
+    } else {
+      // If we're on the correct chain, refresh the contract
+      await setupContract();
+      toast.success("Connected to eduChain Testnet!");
+    }
   };
 
   const getCurrentChainId = async (): Promise<string | null> => {
@@ -124,7 +118,7 @@ export const Web3Provider = ({ children }: { children: React.ReactNode }) => {
   const checkNetworkSupport = async (): Promise<boolean> => {
     const chainId = await getCurrentChainId();
     if (!chainId) return false;
-    return !!SUPPORTED_NETWORKS[chainId as keyof typeof SUPPORTED_NETWORKS];
+    return chainId === EDU_CHAIN_CONFIG.chainId;
   };
 
   const switchToEduChain = async (): Promise<boolean> => {
@@ -139,7 +133,20 @@ export const Web3Provider = ({ children }: { children: React.ReactNode }) => {
         method: 'wallet_switchEthereumChain',
         params: [{ chainId: EDU_CHAIN_CONFIG.chainId }]
       });
-      return true;
+      
+      // Wait a moment for the chain to switch before checking
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Verify we're on the right chain
+      const currentChainId = await getCurrentChainId();
+      if (currentChainId === EDU_CHAIN_CONFIG.chainId) {
+        toast.success('Successfully switched to eduChain Testnet!');
+        await setupContract();
+        return true;
+      } else {
+        toast.error('Failed to switch to eduChain Testnet');
+        return false;
+      }
     } catch (switchError: any) {
       // This error code indicates that the chain has not been added to MetaMask
       if (switchError.code === 4902) {
@@ -148,7 +155,20 @@ export const Web3Provider = ({ children }: { children: React.ReactNode }) => {
             method: 'wallet_addEthereumChain',
             params: [EDU_CHAIN_CONFIG]
           });
-          return true;
+          
+          // Wait a moment for the chain to be added before checking
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          
+          // Verify we're on the right chain
+          const currentChainId = await getCurrentChainId();
+          if (currentChainId === EDU_CHAIN_CONFIG.chainId) {
+            toast.success('Successfully added and switched to eduChain Testnet!');
+            await setupContract();
+            return true;
+          } else {
+            toast.error('Failed to switch to eduChain Testnet after adding it');
+            return false;
+          }
         } catch (addError) {
           console.error('Error adding eduChain network to MetaMask:', addError);
           toast.error('Failed to add eduChain network to your wallet');
@@ -172,9 +192,9 @@ export const Web3Provider = ({ children }: { children: React.ReactNode }) => {
       setWallet(accounts[0]);
       setIsConnected(true);
       
-      // Check if we're on a supported network
-      const isNetworkSupported = await checkNetworkSupport();
-      if (!isNetworkSupported) {
+      // Check if we're on the correct network
+      const chainId = await getCurrentChainId();
+      if (chainId !== EDU_CHAIN_CONFIG.chainId) {
         toast.warning('You are connected to an unsupported network. Switching to eduChain...');
         await switchToEduChain();
       } else {
@@ -206,6 +226,14 @@ export const Web3Provider = ({ children }: { children: React.ReactNode }) => {
         return;
       }
       
+      // Check if we're on the right network first
+      const chainId = await getCurrentChainId();
+      if (chainId !== EDU_CHAIN_CONFIG.chainId) {
+        console.warn('Not on eduChain network, contract may not work correctly');
+        // Don't setup contract if we're on the wrong network
+        return;
+      }
+      
       const provider = new ethers.BrowserProvider(window.ethereum);
       try {
         const signer = await provider.getSigner();
@@ -213,6 +241,7 @@ export const Web3Provider = ({ children }: { children: React.ReactNode }) => {
         // Use the CONTRACT_ADDRESS and ABI defined at the top
         const contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
         setContract(contract);
+        console.log("Contract setup successfully");
       } catch (signerError) {
         console.error('Failed to get signer:', signerError);
         // At least setup a read-only contract with provider

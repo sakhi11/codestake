@@ -54,6 +54,12 @@ export async function getCurrentChainId(): Promise<string | null> {
   }
 }
 
+// Function to check if we're on eduChain
+export async function isOnEduChain(): Promise<boolean> {
+  const chainId = await getCurrentChainId();
+  return chainId === EDU_CHAIN_CONFIG.chainId;
+}
+
 // Function to switch to eduChain network
 export async function switchToEduChain(): Promise<boolean> {
   if (!window.ethereum) return false;
@@ -64,7 +70,10 @@ export async function switchToEduChain(): Promise<boolean> {
       method: 'wallet_switchEthereumChain',
       params: [{ chainId: EDU_CHAIN_CONFIG.chainId }]
     });
-    return true;
+    
+    // Verify the switch was successful
+    const chainId = await getCurrentChainId();
+    return chainId === EDU_CHAIN_CONFIG.chainId;
   } catch (switchError: any) {
     // This error code indicates that the chain has not been added to MetaMask
     if (switchError.code === 4902) {
@@ -73,7 +82,10 @@ export async function switchToEduChain(): Promise<boolean> {
           method: 'wallet_addEthereumChain',
           params: [EDU_CHAIN_CONFIG]
         });
-        return true;
+        
+        // Verify the network was added and switched to
+        const chainId = await getCurrentChainId();
+        return chainId === EDU_CHAIN_CONFIG.chainId;
       } catch (addError) {
         console.error('Error adding eduChain network to MetaMask:', addError);
         return false;
@@ -136,9 +148,9 @@ export async function getUserBalance(userAddress: string): Promise<number> {
 export function handleContractError(error: any): string {
   console.error('Contract error:', error);
   
-  // Network related errors
+  // Network related errors - specific to eduChain
   if (error.code === 'NETWORK_ERROR') {
-    return "Network error. Please check your connection and try again.";
+    return "Network error. Please check your connection to eduChain Testnet and try again.";
   }
   
   // User rejected transaction
@@ -148,7 +160,7 @@ export function handleContractError(error: any): string {
   
   // Insufficient funds
   if (error.message && error.message.includes('insufficient funds')) {
-    return "Insufficient funds for this transaction.";
+    return "Insufficient funds for this transaction. Make sure you have enough EDU tokens.";
   }
 
   // Gas estimation failures often indicate contract-level issues
