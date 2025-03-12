@@ -14,6 +14,19 @@ const CONTRACT_ABI = [
   "function challengeCounter() view returns (uint256)"
 ];
 
+// eduChain Testnet configuration
+export const EDU_CHAIN_CONFIG = {
+  chainId: '0xa045c', // 656476 in decimal
+  chainName: 'eduChain Testnet',
+  nativeCurrency: {
+    name: 'EDU',
+    symbol: 'EDU',
+    decimals: 18
+  },
+  rpcUrls: ['https://open-campus-codex-sepolia.drpc.org'],
+  blockExplorerUrls: ['https://explorer.edu.ooo/']
+};
+
 // Classname utility function (for Tailwind)
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -41,10 +54,47 @@ export async function getCurrentChainId(): Promise<string | null> {
   }
 }
 
+// Function to switch to eduChain network
+export async function switchToEduChain(): Promise<boolean> {
+  if (!window.ethereum) return false;
+  
+  try {
+    // Try to switch to eduChain network
+    await window.ethereum.request({
+      method: 'wallet_switchEthereumChain',
+      params: [{ chainId: EDU_CHAIN_CONFIG.chainId }]
+    });
+    return true;
+  } catch (switchError: any) {
+    // This error code indicates that the chain has not been added to MetaMask
+    if (switchError.code === 4902) {
+      try {
+        await window.ethereum.request({
+          method: 'wallet_addEthereumChain',
+          params: [EDU_CHAIN_CONFIG]
+        });
+        return true;
+      } catch (addError) {
+        console.error('Error adding eduChain network to MetaMask:', addError);
+        return false;
+      }
+    }
+    console.error('Error switching to eduChain network:', switchError);
+    return false;
+  }
+}
+
 // Function to Connect Wallet
 export async function connectWallet() {
   if (window.ethereum) {
     try {
+      // Ensure user is on eduChain network
+      const chainId = await getCurrentChainId();
+      if (chainId !== EDU_CHAIN_CONFIG.chainId) {
+        const switched = await switchToEduChain();
+        if (!switched) throw new Error("Failed to switch to eduChain network");
+      }
+      
       const provider = new ethers.BrowserProvider(window.ethereum);
       await window.ethereum.request({ method: "eth_requestAccounts" });
       const signer = await provider.getSigner();
@@ -103,7 +153,12 @@ export function handleContractError(error: any): string {
 
   // Gas estimation failures often indicate contract-level issues
   if (error.message && error.message.includes('estimate gas')) {
-    return "Transaction would fail. The contract is rejecting this operation. Possible reasons: incorrect parameters, insufficient allowance, or contract restrictions.";
+    return "Transaction would fail. The contract is rejecting this operation. Please ensure you are connected to eduChain Testnet (Chain ID: 0xa045c).";
+  }
+  
+  // "Missing revert data" errors typically indicate chain/contract mismatch
+  if (error.message && error.message.includes('missing revert data')) {
+    return "Transaction failed. Please make sure you're connected to eduChain Testnet (Chain ID: 0xa045c) and try again.";
   }
   
   // CALL_EXCEPTION typically means the contract function reverted
@@ -114,7 +169,7 @@ export function handleContractError(error: any): string {
     
     // Missing revert data errors
     if (error.message && error.message.includes('missing revert data')) {
-      return "Transaction would fail. Please check that you're connected to the correct network and that your parameters are valid.";
+      return "Transaction would fail. Please verify you're connected to eduChain Testnet (Chain ID: 0xa045c) and that your parameters are valid.";
     }
     
     return "The smart contract rejected this operation. Please verify your inputs and try again.";

@@ -5,6 +5,7 @@ import { ethers } from "ethers";
 import { toast } from "sonner";
 import DashboardNavbar from "@/components/layout/DashboardNavbar";
 import Footer from "@/components/layout/Footer";
+import { EDU_CHAIN_CONFIG } from "@/lib/utils";
 import {
   Card,
   CardContent,
@@ -18,7 +19,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
 import { DollarSign, ArrowDownCircle, Download, Upload, X } from "lucide-react";
 
 // Mock transactions for demo
@@ -62,7 +62,7 @@ const PLACEHOLDER_BALANCE = {
 };
 
 const Balance = () => {
-  const { wallet, contract, isConnected, connectWallet } = useWeb3();
+  const { wallet, contract, isConnected, connectWallet, switchToEduChain, getCurrentChainId } = useWeb3();
   const [isLoading, setIsLoading] = useState(false);
   const [depositAmount, setDepositAmount] = useState("");
   const [withdrawAmount, setWithdrawAmount] = useState("");
@@ -70,9 +70,11 @@ const Balance = () => {
   const [showWithdrawModal, setShowWithdrawModal] = useState(false);
   const [balance, setBalance] = useState(PLACEHOLDER_BALANCE);
   const [transactions, setTransactions] = useState(mockTransactions);
+  const [isCorrectNetwork, setIsCorrectNetwork] = useState(false);
 
   useEffect(() => {
     if (wallet && isConnected) {
+      checkNetwork();
       fetchBalanceAndTransactions();
     } else {
       // Show placeholder data when not connected
@@ -81,9 +83,32 @@ const Balance = () => {
     }
   }, [wallet, isConnected]);
 
+  const checkNetwork = async () => {
+    const chainId = await getCurrentChainId();
+    const isEduChain = chainId === EDU_CHAIN_CONFIG.chainId;
+    setIsCorrectNetwork(isEduChain);
+    
+    if (!isEduChain) {
+      toast.warning(`Please switch to eduChain Testnet for this feature to work properly`, {
+        action: {
+          label: 'Switch Network',
+          onClick: () => switchToEduChain()
+        }
+      });
+    }
+  };
+
   const fetchBalanceAndTransactions = async () => {
     setIsLoading(true);
     try {
+      // Check network first
+      const chainId = await getCurrentChainId();
+      if (chainId !== EDU_CHAIN_CONFIG.chainId) {
+        toast.warning("Please switch to eduChain Testnet for accurate balance data");
+        setIsLoading(false);
+        return;
+      }
+      
       // Try to fetch real data from contract
       if (contract && wallet) {
         try {
@@ -138,16 +163,31 @@ const Balance = () => {
 
     setIsLoading(true);
     try {
+      // Check network first
+      const chainId = await getCurrentChainId();
+      if (chainId !== EDU_CHAIN_CONFIG.chainId) {
+        await switchToEduChain();
+      }
+      
       if (!contract || !wallet) {
         throw new Error("Wallet not connected");
       }
 
       const depositValueWei = ethers.parseEther(depositAmount);
+      
+      // Estimate gas to check if transaction will fail
+      try {
+        await contract.deposit.estimateGas({ value: depositValueWei });
+      } catch (gasError) {
+        console.error("Gas estimation failed:", gasError);
+        throw new Error("Transaction would fail. Please verify you're connected to eduChain Testnet.");
+      }
+      
       const tx = await contract.deposit({ value: depositValueWei });
       
       toast.loading("Processing deposit...");
       await tx.wait();
-      toast.success(`Successfully deposited ${depositAmount} ETH`);
+      toast.success(`Successfully deposited ${depositAmount} EDU`);
       
       // Update balance after transaction
       await fetchBalanceAndTransactions();
@@ -174,16 +214,31 @@ const Balance = () => {
 
     setIsLoading(true);
     try {
+      // Check network first
+      const chainId = await getCurrentChainId();
+      if (chainId !== EDU_CHAIN_CONFIG.chainId) {
+        await switchToEduChain();
+      }
+      
       if (!contract || !wallet) {
         throw new Error("Wallet not connected");
       }
 
       const withdrawValueWei = ethers.parseEther(withdrawAmount);
+      
+      // Estimate gas to check if transaction will fail
+      try {
+        await contract.withdraw.estimateGas(withdrawValueWei);
+      } catch (gasError) {
+        console.error("Gas estimation failed:", gasError);
+        throw new Error("Transaction would fail. Please verify you're connected to eduChain Testnet.");
+      }
+      
       const tx = await contract.withdraw(withdrawValueWei);
       
       toast.loading("Processing withdrawal...");
       await tx.wait();
-      toast.success(`Successfully withdrew ${withdrawAmount} ETH`);
+      toast.success(`Successfully withdrew ${withdrawAmount} EDU`);
       
       // Update balance after transaction
       await fetchBalanceAndTransactions();

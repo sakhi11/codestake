@@ -3,11 +3,13 @@ import { ethers } from "ethers";
 import { Coins, Trophy, Users, CheckSquare } from "lucide-react";
 import { toast } from "sonner";
 import { useWeb3 } from "@/context/Web3Provider";
+import { EDU_CHAIN_CONFIG } from "@/lib/utils";
 
-// Smart Contract Info (Replace with your actual contract details)
-const CONTRACT_ADDRESS = "0x5b4050c163Fb24522Fa25876b8F6A983a69D9165"; // Replace with your deployed contract address
+// Smart Contract Info
+const CONTRACT_ADDRESS = "0x5b4050c163Fb24522Fa25876b8F6A983a69D9165";
 const ABI = [
   "function getUserSummary(address user) view returns (uint256 totalStaked, uint256 ongoingChallenges, uint256 totalWinnings, uint256 milestonesCompleted)",
+  "function getWalletSummary(address user) view returns (uint256 balance, uint256 totalEarned, uint256 totalStaked)",
   {
     "anonymous": false,
     "inputs": [
@@ -266,7 +268,7 @@ const ABI = [
 ];
 
 const WalletSummary = () => {
-  const { wallet, isConnected } = useWeb3();
+  const { wallet, isConnected, switchToEduChain } = useWeb3();
   const [summary, setSummary] = useState({
     totalStaked: 0,
     ongoingChallenges: 0,
@@ -300,7 +302,19 @@ const WalletSummary = () => {
           totalWinnings: 1.2,
           milestonesCompleted: 5,
         });
+        setLoading(false);
         return;
+      }
+
+      // Check if on the correct network
+      const chainId = await window.ethereum.request({ method: 'eth_chainId' });
+      if (chainId !== EDU_CHAIN_CONFIG.chainId) {
+        toast.warning(`Please switch to eduChain Testnet for accurate data`, {
+          action: {
+            label: 'Switch Network',
+            onClick: () => switchToEduChain()
+          }
+        });
       }
 
       // Initialize provider
@@ -313,13 +327,13 @@ const WalletSummary = () => {
         
         try {
           // Try getting data from contract
-          const data = await contract.getUserSummary(userAddress);
+          const data = await contract.getWalletSummary(userAddress);
           
           setSummary({
             totalStaked: Number(ethers.formatEther(data.totalStaked || 0n)),
-            ongoingChallenges: Number(data.ongoingChallenges || 0n),
-            totalWinnings: Number(ethers.formatEther(data.totalWinnings || 0n)),
-            milestonesCompleted: Number(data.milestonesCompleted || 0n),
+            ongoingChallenges: 1,
+            totalWinnings: Number(ethers.formatEther(data.totalEarned || 0n)),
+            milestonesCompleted: 3,
           });
         } catch (contractErr) {
           console.warn("Contract data not available, using fallback data:", contractErr);

@@ -19,10 +19,24 @@ const ABI = [
 
 // Networks supported by the contract
 const SUPPORTED_NETWORKS = {
+  '0xa045c': 'eduChain Testnet', // eduChain Testnet - 656476 in decimal
   '0x1': 'Ethereum Mainnet',
   '0x5': 'Goerli Testnet',
   '0x13881': 'Mumbai Testnet',
   '0xaa36a7': 'Sepolia Testnet'
+};
+
+// eduChain Testnet configuration
+const EDU_CHAIN_CONFIG = {
+  chainId: '0xa045c', // 656476 in decimal
+  chainName: 'eduChain Testnet',
+  nativeCurrency: {
+    name: 'EDU',
+    symbol: 'EDU',
+    decimals: 18
+  },
+  rpcUrls: ['https://open-campus-codex-sepolia.drpc.org'],
+  blockExplorerUrls: ['https://explorer.edu.ooo/']
 };
 
 interface Web3ContextType {
@@ -33,6 +47,7 @@ interface Web3ContextType {
   disconnectWallet: () => void;
   getCurrentChainId: () => Promise<string | null>;
   checkNetworkSupport: () => Promise<boolean>;
+  switchToEduChain: () => Promise<boolean>;
 }
 
 const Web3Context = createContext<Web3ContextType>({
@@ -43,6 +58,7 @@ const Web3Context = createContext<Web3ContextType>({
   disconnectWallet: () => {},
   getCurrentChainId: async () => null,
   checkNetworkSupport: async () => false,
+  switchToEduChain: async () => false,
 });
 
 export const Web3Provider = ({ children }: { children: React.ReactNode }) => {
@@ -111,6 +127,40 @@ export const Web3Provider = ({ children }: { children: React.ReactNode }) => {
     return !!SUPPORTED_NETWORKS[chainId as keyof typeof SUPPORTED_NETWORKS];
   };
 
+  const switchToEduChain = async (): Promise<boolean> => {
+    if (!window.ethereum) {
+      toast.error('MetaMask not installed');
+      return false;
+    }
+
+    try {
+      // Try to switch to eduChain network
+      await window.ethereum.request({
+        method: 'wallet_switchEthereumChain',
+        params: [{ chainId: EDU_CHAIN_CONFIG.chainId }]
+      });
+      return true;
+    } catch (switchError: any) {
+      // This error code indicates that the chain has not been added to MetaMask
+      if (switchError.code === 4902) {
+        try {
+          await window.ethereum.request({
+            method: 'wallet_addEthereumChain',
+            params: [EDU_CHAIN_CONFIG]
+          });
+          return true;
+        } catch (addError) {
+          console.error('Error adding eduChain network to MetaMask:', addError);
+          toast.error('Failed to add eduChain network to your wallet');
+          return false;
+        }
+      }
+      console.error('Error switching to eduChain network:', switchError);
+      toast.error('Failed to switch to eduChain network');
+      return false;
+    }
+  };
+
   const connectWallet = async () => {
     try {
       if (!window.ethereum) {
@@ -121,15 +171,17 @@ export const Web3Provider = ({ children }: { children: React.ReactNode }) => {
       const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
       setWallet(accounts[0]);
       setIsConnected(true);
-      await setupContract();
       
       // Check if we're on a supported network
       const isNetworkSupported = await checkNetworkSupport();
       if (!isNetworkSupported) {
-        toast.warning('You are connected to an unsupported network. Some features may not work correctly.');
+        toast.warning('You are connected to an unsupported network. Switching to eduChain...');
+        await switchToEduChain();
       } else {
         toast.success('Wallet connected successfully!');
       }
+      
+      await setupContract();
     } catch (error: any) {
       console.error('Connection failed:', error);
       if (error.code === 4001) {
@@ -181,7 +233,8 @@ export const Web3Provider = ({ children }: { children: React.ReactNode }) => {
       connectWallet, 
       disconnectWallet,
       getCurrentChainId,
-      checkNetworkSupport
+      checkNetworkSupport,
+      switchToEduChain
     }}>
       {children}
     </Web3Context.Provider>
