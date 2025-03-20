@@ -44,8 +44,8 @@ const QuizModal: React.FC<QuizModalProps> = ({ isOpen, onClose, milestone, onSub
               {milestone?.description || 'Complete the challenge by writing code that passes all tests.'}
             </p>
             <CodeEditor 
-              code={code} 
-              onChange={setCode} 
+              initialCode={code} 
+              onCodeChange={setCode} 
               height="300px" 
             />
           </div>

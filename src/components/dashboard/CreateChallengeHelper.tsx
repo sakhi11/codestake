@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -20,6 +21,7 @@ interface Props {
     track: string;
   }) => Promise<void>;
   isSubmitting: boolean;
+  walletBalance: string;  // Add wallet balance prop
 }
 
 const CreateChallengeHelper: React.FC<Props> = ({
@@ -33,6 +35,7 @@ const CreateChallengeHelper: React.FC<Props> = ({
   setTrack,
   onCreateChallenge,
   isSubmitting,
+  walletBalance,  // Receive wallet balance
 }) => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -73,6 +76,7 @@ const CreateChallengeHelper: React.FC<Props> = ({
           placeholder="0.1"
           required
         />
+        <p className="text-sm text-gray-500 mt-1">Wallet Balance: {walletBalance} ETH</p>
       </div>
       <div>
         <Label htmlFor="track">Track</Label>

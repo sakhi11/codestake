@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import DashboardNavbar from "@/components/layout/DashboardNavbar";
 import WalletSummary from "@/components/dashboard/WalletSummary";
@@ -8,6 +7,7 @@ import Footer from "@/components/layout/Footer";
 import { toast } from "sonner";
 import { useWeb3 } from "@/context/Web3Provider";
 import { ethers } from "ethers";
+import { EDU_CHAIN_CONFIG } from "@/lib/utils";
 
 interface Challenge {
   id: string;
@@ -83,12 +83,24 @@ const Dashboard = () => {
     }
 
     try {
-      const walletSummary = await contract.getWalletSummary(wallet);
+      const walletSummary = await contract.getWalletSummary?.(wallet).catch(() => null);
+      
       if (walletSummary) {
         setWalletBalance(ethers.formatEther(walletSummary.balance || 0n));
+      } else {
+        const provider = new ethers.BrowserProvider(window.ethereum);
+        const balance = await provider.getBalance(wallet);
+        setWalletBalance(ethers.formatEther(balance));
       }
     } catch (error) {
       console.error("Error fetching wallet balance:", error);
+      try {
+        const provider = new ethers.BrowserProvider(window.ethereum);
+        const balance = await provider.getBalance(wallet);
+        setWalletBalance(ethers.formatEther(balance));
+      } catch (err) {
+        console.error("Error getting native balance:", err);
+      }
     }
   };
 
@@ -200,7 +212,6 @@ const Dashboard = () => {
     try {
       const stakeInWei = ethers.parseEther(newChallenge.stakeAmount);
       
-      // Check if user has enough balance
       const userBalance = ethers.parseEther(walletBalance);
       if (userBalance < stakeInWei) {
         toast.error(`Insufficient balance. Please deposit funds in the Balance section.`);
@@ -209,7 +220,6 @@ const Dashboard = () => {
       
       toast.loading("Creating challenge...");
 
-      // Updated to use the new contract method (no value being sent)
       const tx = await contract.createChallenge(
         "Learning Challenge", // name
         newChallenge.track,  // track

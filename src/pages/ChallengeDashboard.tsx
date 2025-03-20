@@ -1,13 +1,17 @@
 import React, { useState, useEffect } from "react";
 import DashboardNavbar from "@/components/layout/DashboardNavbar";
-import Footer from "@/components/layout/Footer";
-import { ethers } from "ethers";
-import { useNavigate } from "react-router-dom";
-import { useWeb3 } from "@/context/Web3Provider";
-import QuizModal from "@/components/quiz/QuizModal";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
+import { useWeb3 } from "@/context/Web3Provider";
+import { ethers } from "ethers";
+import { useParams, useNavigate } from "react-router-dom";
+import QuizModal from "@/components/quiz/QuizModal";
+import Footer from "@/components/layout/Footer";
+import { CheckCircle, XCircle, AlertCircle, Calendar, Zap } from "lucide-react";
+import { EDU_CHAIN_CONFIG } from "@/lib/utils";
 
 interface MilestoneItem {
   id: number;
@@ -65,7 +69,9 @@ const Milestone = ({ milestone }: { milestone: MilestoneItem }) => {
 };
 
 const ChallengeDashboard = () => {
-  const { wallet: address, contract, isConnected } = useWeb3();
+  const navigate = useNavigate();
+  const { id } = useParams<{ id: string }>();
+  const { wallet, contract, isConnected, switchToEduChain } = useWeb3();
   const [milestones, setMilestones] = useState<MilestoneItem[]>([
     {
       id: 1,
@@ -101,11 +107,10 @@ const ChallengeDashboard = () => {
   const [contractValid, setContractValid] = useState(true);
 
   useEffect(() => {
-    console.log("ChallengeDashboard - Address:", address);
+    console.log("ChallengeDashboard - Address:", wallet);
     console.log("ChallengeDashboard - Contract:", contract);
     console.log("ChallengeDashboard - IsConnected:", isConnected);
     
-    // Check if we're on the correct network
     const checkNetwork = async () => {
       if (window.ethereum) {
         const chainId = await window.ethereum.request({ method: 'eth_chainId' });
@@ -117,7 +122,6 @@ const ChallengeDashboard = () => {
       }
     };
     
-    // Also check if contract has required methods
     const validateContract = () => {
       if (contract) {
         console.log("Contract methods:", Object.keys(contract));
@@ -131,9 +135,48 @@ const ChallengeDashboard = () => {
     
     checkNetwork();
     validateContract();
-  }, [address, contract, isConnected]);
+  }, [wallet, contract, isConnected]);
 
-  // When modal opens for a milestone, provide an empty onSubmit prop to satisfy the component
+  const handleNetworkCheck = async () => {
+    if (!window.ethereum) return false;
+    
+    try {
+      const chainId = await window.ethereum.request({ method: 'eth_chainId' });
+      if (chainId !== EDU_CHAIN_CONFIG.chainId) {
+        toast.warning("You're not connected to eduChain. Please switch networks.", {
+          action: {
+            label: 'Switch Network',
+            onClick: async () => {
+              try {
+                await switchToEduChain();
+                await fetchChallenge();
+              } catch (error) {
+                console.error("Failed to switch network:", error);
+                toast.error("Failed to switch network. Please try manually in your wallet.");
+              }
+            }
+          }
+        });
+        return false;
+      }
+      return true;
+    } catch (error) {
+      console.error("Error checking network:", error);
+      return false;
+    }
+  };
+
+  const fetchChallenge = async () => {
+    if (id) {
+      const challenge = await contract.getChallenge(id);
+      setMilestones([challenge]);
+    }
+  };
+
+  useEffect(() => {
+    fetchChallenge();
+  }, [id]);
+
   const handleOpenQuizModal = (milestone: any) => {
     setSelectedMilestone(milestone);
     setIsQuizModalOpen(true);
@@ -162,7 +205,7 @@ const ChallengeDashboard = () => {
 
   return (
     <div className="min-h-screen bg-web3-background">
-      <DashboardNavbar address={address} />
+      <DashboardNavbar address={wallet} />
       <main className="container mx-auto px-4 py-8 mt-16">
         <div className="mb-8">
           <Card className="glassmorphism border border-white/10">
