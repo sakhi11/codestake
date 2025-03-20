@@ -11,6 +11,9 @@ import { EDU_CHAIN_CONFIG } from '@/lib/utils';
 export function useContractDebugger() {
   const { wallet, contract, getCurrentChainId, switchToEduChain } = useWeb3();
   const [isDebugMode, setIsDebugMode] = useState(false);
+  const [isBusy, setIsBusy] = useState(false);
+  const [lastError, setLastError] = useState<string | null>(null);
+  const [lastDebugLog, setLastDebugLog] = useState<string | null>(null);
   const [networkStatus, setNetworkStatus] = useState<{
     chainId: string | null;
     isCorrectNetwork: boolean;
@@ -38,6 +41,29 @@ export function useContractDebugger() {
     
     checkNetwork();
   }, [wallet, getCurrentChainId]);
+
+  // Debug a transaction
+  const debugTransaction = async (
+    fn: () => Promise<any>,
+    description: string
+  ) => {
+    setIsBusy(true);
+    setLastError(null);
+    setLastDebugLog(`Starting: ${description}...`);
+    
+    try {
+      const result = await fn();
+      setLastDebugLog(`Success: ${description}`);
+      return { success: true, result };
+    } catch (error: any) {
+      const errorMessage = error.message || String(error);
+      setLastError(errorMessage);
+      setLastDebugLog(`Failed: ${description} - ${errorMessage}`);
+      return { success: false, error };
+    } finally {
+      setIsBusy(false);
+    }
+  };
 
   // Helper to validate and debug contract calls
   const debugContractCall = async (
@@ -99,7 +125,11 @@ export function useContractDebugger() {
     toggleDebugMode,
     networkStatus,
     debugContractCall,
-    ensureCorrectNetwork
+    ensureCorrectNetwork,
+    debugTransaction,
+    isBusy,
+    lastError,
+    lastDebugLog
   };
 }
 

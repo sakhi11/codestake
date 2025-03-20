@@ -1,516 +1,156 @@
-
 import React, { useState, useEffect } from "react";
 import { ethers } from "ethers";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { PlusCircle, Sparkles, Users, BookOpen, Calendar, AlertCircle, Wallet } from "lucide-react";
-import { useWeb3 } from "@/context/Web3Provider";
 import { toast } from "sonner";
 import { 
-  EDU_CHAIN_CONFIG, 
-  getCurrentChainId, 
-  handleContractError, 
-  switchToEduChain,
-  safeContractCall
-} from "@/lib/utils";
-import { Link } from "react-router-dom";
+  Card, 
+  CardContent, 
+  CardDescription, 
+  CardFooter, 
+  CardHeader, 
+  CardTitle 
+} from "@/components/ui/card"; // Fixed casing
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button"; // Fixed casing
+import { useWeb3 } from "@/context/Web3Provider";
+import { Loader2 } from "lucide-react";
 
-const TRACKS = [
-  { id: "javascript", name: "JavaScript" },
-  { id: "solidity", name: "Solidity" },
-  { id: "python", name: "Python" },
-  { id: "rust", name: "Rust" },
-  { id: "react", name: "React" },
-];
+interface NewChallenge {
+  player1: string;
+  player2: string;
+  stakeAmount: string;
+  track: string;
+}
 
-const validateContractState = (contract) => {
-  if (!contract) {
-    return { valid: false, error: "Contract not initialized. Please reconnect your wallet." };
-  }
-  
-  if (!contract.createChallenge) {
-    return { 
-      valid: false, 
-      error: "Contract method 'createChallenge' not found. Make sure you're connected to eduChain Testnet." 
-    };
-  }
-  
-  return { valid: true };
-};
+interface CreateChallengeProps {
+  onCreateChallenge: (challenge: NewChallenge) => Promise<void>;
+  walletBalance: string;
+}
 
-const CreateChallenge = ({ onCreateChallenge, walletBalance = "0" }) => {
-  const { contract, wallet, isConnected } = useWeb3();
-  const [isExpanded, setIsExpanded] = useState(false);
+const CreateChallenge: React.FC<CreateChallengeProps> = ({ onCreateChallenge, walletBalance }) => {
+  const [player1, setPlayer1] = useState("");
+  const [player2, setPlayer2] = useState("");
   const [stakeAmount, setStakeAmount] = useState("");
-  const [participants, setParticipants] = useState<string[]>([""]);
-  const [selectedTrack, setSelectedTrack] = useState("");
-  const [errors, setErrors] = useState({
-    stakeAmount: "",
-    participants: [""],
-    track: "",
-  });
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [networkError, setNetworkError] = useState<string | null>(null);
-  const [debugInfo, setDebugInfo] = useState<string | null>(null);
-  const [contractValid, setContractValid] = useState(true);
+  const [track, setTrack] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const { wallet } = useWeb3();
 
-  useEffect(() => {
-    const checkNetwork = async () => {
-      if (isConnected) {
-        const chainId = await getCurrentChainId();
-        if (chainId && chainId !== EDU_CHAIN_CONFIG.chainId) {
-          setNetworkError(`Please connect to eduChain Testnet (Chain ID: ${EDU_CHAIN_CONFIG.chainId}). Current network is not supported.`);
-        } else {
-          setNetworkError(null);
-        }
-      }
-    };
-    
-    checkNetwork();
-    
-    if (contract) {
-      const validation = validateContractState(contract);
-      setContractValid(validation.valid);
-      if (!validation.valid) {
-        setDebugInfo(validation.error);
-      }
-    }
-  }, [isConnected, wallet, contract]);
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
 
-  const toggleForm = () => {
-    setIsExpanded(!isExpanded);
-    if (isExpanded) {
-      resetForm();
-    }
-  };
-
-  const resetForm = () => {
-    setStakeAmount("");
-    setParticipants([""]);
-    setSelectedTrack("");
-    setErrors({
-      stakeAmount: "",
-      participants: [""],
-      track: "",
-    });
-    setIsSubmitting(false);
-    setDebugInfo(null);
-  };
-
-  const addParticipant = () => {
-    if (participants.length < 4) {
-      setParticipants([...participants, ""]);
-      setErrors({
-        ...errors,
-        participants: [...errors.participants, ""],
-      });
-    }
-  };
-
-  const removeParticipant = (index: number) => {
-    const updatedParticipants = [...participants];
-    updatedParticipants.splice(index, 1);
-    setParticipants(updatedParticipants);
-
-    const updatedErrors = [...errors.participants];
-    updatedErrors.splice(index, 1);
-    setErrors({
-      ...errors,
-      participants: updatedErrors,
-    });
-  };
-
-  const updateParticipant = (index: number, value: string) => {
-    const updatedParticipants = [...participants];
-    updatedParticipants[index] = value;
-    setParticipants(updatedParticipants);
-
-    if (value) {
-      const updatedErrors = [...errors.participants];
-      updatedErrors[index] = "";
-      setErrors({
-        ...errors,
-        participants: updatedErrors,
-      });
-    }
-  };
-
-  const validateForm = () => {
-    let valid = true;
-    const newErrors = {
-      stakeAmount: "",
-      participants: participants.map(() => ""),
-      track: "",
-    };
-
-    if (!stakeAmount) {
-      newErrors.stakeAmount = "Stake amount is required";
-      valid = false;
-    } else if (isNaN(Number(stakeAmount)) || Number(stakeAmount) <= 0) {
-      newErrors.stakeAmount = "Please enter a valid amount";
-      valid = false;
-    } else {
-      // Check if stake amount exceeds wallet balance
-      try {
-        const stakeInWei = ethers.parseEther(stakeAmount);
-        const balanceInWei = ethers.parseEther(walletBalance);
-        
-        if (stakeInWei > balanceInWei) {
-          newErrors.stakeAmount = "Insufficient balance. Please deposit funds first.";
-          valid = false;
-        }
-      } catch (e) {
-        newErrors.stakeAmount = "Invalid amount format";
-        valid = false;
-      }
-    }
-
-    participants.forEach((participant, index) => {
-      if (!participant) {
-        newErrors.participants[index] = "Wallet address is required";
-        valid = false;
-      } else if (!/^0x[a-fA-F0-9]{40}$/.test(participant)) {
-        newErrors.participants[index] = "Invalid Ethereum address";
-        valid = false;
-      }
-    });
-
-    if (!selectedTrack) {
-      newErrors.track = "Please select a track";
-      valid = false;
-    }
-
-    setErrors(newErrors);
-    return valid;
-  };
-
-  const handleSwitchNetwork = async () => {
-    toast.loading("Switching to eduChain network...");
-    try {
-      const success = await switchToEduChain();
-      if (success) {
-        toast.success("Successfully switched to eduChain network!");
-        setNetworkError(null);
-        return true;
-      } else {
-        toast.error("Failed to switch to eduChain network");
-        return false;
-      }
-    } catch (error) {
-      console.error("Error switching network:", error);
-      toast.error("Failed to switch to eduChain network");
-      return false;
-    } finally {
-      toast.dismiss();
-    }
-  };
-
-  const handleSubmit = async () => {
-    if (!validateForm()) return;
-    
-    const chainId = await getCurrentChainId();
-    if (chainId && chainId !== EDU_CHAIN_CONFIG.chainId) {
-      toast.error(`Please connect to eduChain Testnet (Chain ID: ${EDU_CHAIN_CONFIG.chainId})`);
-      const switched = await handleSwitchNetwork();
-      if (!switched) return;
-    }
-
-    const contractStatus = validateContractState(contract);
-    if (!contractStatus.valid) {
-      toast.error(contractStatus.error);
-      setDebugInfo(contractStatus.error);
+    if (!player1 || !player2 || !stakeAmount || !track) {
+      toast.error("Please fill in all fields.");
       return;
     }
 
-    setIsSubmitting(true);
-    setDebugInfo(null);
+    if (player1 === player2) {
+      toast.error("Player 1 and Player 2 cannot be the same address.");
+      return;
+    }
 
+    setIsLoading(true);
     try {
-      if (!window.ethereum) {
-        throw new Error("No wallet found. Please install MetaMask.");
-      }
-
-      // Submit challenge to the parent component
-      onCreateChallenge({
-        player1: participants[0],
-        player2: participants.length > 1 ? participants[1] : wallet,
-        stakeAmount: stakeAmount,
-        track: selectedTrack
-      });
-
-      resetForm();
-      setIsExpanded(false);
-    } catch (error: any) {
-      console.error("Error creating challenge:", error);
-      const errorMessage = handleContractError(error);
-      toast.error(errorMessage);
-      setDebugInfo(errorMessage);
+      const newChallenge = {
+        player1,
+        player2,
+        stakeAmount,
+        track,
+      };
+      await onCreateChallenge(newChallenge);
+      setPlayer1("");
+      setPlayer2("");
+      setStakeAmount("");
+      setTrack("");
     } finally {
-      setIsSubmitting(false);
+      setIsLoading(false);
     }
   };
 
-  const SwitchNetworkButton = () => {
-    if (!networkError) return null;
-    
-    return (
-      <Button 
-        onClick={handleSwitchNetwork}
-        className="mt-2 w-full bg-red-500 hover:bg-red-600"
-      >
-        Switch to eduChain Testnet
-      </Button>
-    );
-  };
-
-  const DebugInfo = () => {
-    if (!debugInfo) return null;
-    
-    return (
-      <div className="bg-black/70 border border-yellow-500 p-3 rounded-md mb-4 text-yellow-200 font-mono text-xs overflow-auto max-h-[150px]">
-        <div className="flex items-center mb-2">
-          <AlertCircle className="h-4 w-4 mr-2 text-yellow-400" />
-          <h4 className="font-bold">Debug Information</h4>
-        </div>
-        <p className="whitespace-pre-wrap">{debugInfo}</p>
-      </div>
-    );
-  };
-
-  const BalanceInfo = () => {
-    return (
-      <div className="bg-blue-500/20 border border-blue-400 p-3 rounded-md mb-4">
-        <div className="flex justify-between items-center">
-          <div>
-            <h4 className="font-semibold text-blue-200 flex items-center">
-              <Wallet className="h-4 w-4 mr-2" />
-              Available Balance
-            </h4>
-            <div className="mt-1 text-white text-xl font-bold">
-              {parseFloat(walletBalance).toFixed(4)} <span className="text-sm">EDU</span>
-            </div>
-          </div>
-          <Link to="/balance">
-            <Button variant="outline" size="sm" className="text-blue-200 border-blue-400 hover:bg-blue-500/30">
-              Add Funds
-            </Button>
-          </Link>
-        </div>
-      </div>
-    );
-  };
-
   return (
-    <section className="mb-12">
-      {!isExpanded ? (
-        <Button
-          onClick={toggleForm}
-          disabled={isSubmitting}
-          className="w-full py-10 flex items-center justify-center gap-3 relative group overflow-hidden transition-all duration-300 transform hover:scale-105 hover:shadow-[0_0_25px_rgba(248,161,0,0.3)]"
-          style={{
-            background: "linear-gradient(135deg, #4A90E2 0%, #F8A100 100%)",
-          }}
-        >
-          <div className="absolute inset-0 w-full h-full bg-white/10 opacity-0 group-hover:opacity-20 transition-opacity duration-300"></div>
-          <PlusCircle className="h-6 w-6 text-white" />
-          <span className="text-xl font-semibold">Create a New Challenge</span>
-        </Button>
-      ) : (
-        <Card className="glassmorphism border border-white/10 mb-8">
-          <CardHeader>
-            <CardTitle className="text-gradient flex items-center">
-              <Sparkles className="h-5 w-5 mr-2 text-web3-orange" />
-              Create a New Learning Challenge
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {networkError && (
-              <div className="bg-red-500/20 border border-red-500 p-3 rounded-md mb-4 text-red-200">
-                <p className="text-sm font-medium">{networkError}</p>
-                <p className="text-xs mt-1">Please switch to eduChain Testnet in your wallet.</p>
-                <SwitchNetworkButton />
-              </div>
+    <Card className="glassmorphism border border-white/10">
+      <CardHeader>
+        <CardTitle className="text-white">Create Challenge</CardTitle>
+        <CardDescription className="text-white/60">
+          Challenge your friend!
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <Label htmlFor="player1" className="text-white">
+              Player 1 Address
+            </Label>
+            <Input
+              type="text"
+              id="player1"
+              placeholder="0x..."
+              value={player1}
+              onChange={(e) => setPlayer1(e.target.value)}
+              className="bg-white/5 border-white/10 text-white"
+            />
+          </div>
+          <div>
+            <Label htmlFor="player2" className="text-white">
+              Player 2 Address
+            </Label>
+            <Input
+              type="text"
+              id="player2"
+              placeholder="0x..."
+              value={player2}
+              onChange={(e) => setPlayer2(e.target.value)}
+              className="bg-white/5 border-white/10 text-white"
+            />
+          </div>
+          <div>
+            <Label htmlFor="stakeAmount" className="text-white">
+              Stake Amount (ETH)
+            </Label>
+            <Input
+              type="number"
+              id="stakeAmount"
+              placeholder="0.0"
+              value={stakeAmount}
+              onChange={(e) => setStakeAmount(e.target.value)}
+              className="bg-white/5 border-white/10 text-white"
+            />
+            {wallet && (
+              <p className="text-white/60 text-sm mt-1">
+                Wallet Balance: {walletBalance} ETH
+              </p>
             )}
-
-            {!contractValid && (
-              <div className="bg-red-500/20 border border-red-500 p-3 rounded-md mb-4 text-red-200">
-                <p className="text-sm font-medium">Contract initialization error</p>
-                <p className="text-xs mt-1">The contract appears to be missing required methods. Please ensure you're connected to eduChain Testnet.</p>
-                <SwitchNetworkButton />
-              </div>
+          </div>
+          <div>
+            <Label htmlFor="track" className="text-white">
+              Track
+            </Label>
+            <Input
+              type="text"
+              id="track"
+              placeholder="e.g. Web Development"
+              value={track}
+              onChange={(e) => setTrack(e.target.value)}
+              className="bg-white/5 border-white/10 text-white"
+            />
+          </div>
+          <Button
+            type="submit"
+            className="w-full"
+            variant="gradient"
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Creating...
+              </>
+            ) : (
+              "Create Challenge"
             )}
-
-            {debugInfo && <DebugInfo />}
-            
-            <BalanceInfo />
-
-            <div className="space-y-6">
-              <div className="space-y-2">
-                <Label htmlFor="stake-amount" className="text-white">
-                  Stake Amount (EDU)
-                </Label>
-                <div className="relative">
-                  <Input
-                    id="stake-amount"
-                    type="text"
-                    value={stakeAmount}
-                    onChange={(e) => setStakeAmount(e.target.value)}
-                    placeholder="0.001"
-                    disabled={isSubmitting}
-                    className={`bg-web3-card border ${
-                      errors.stakeAmount ? "border-web3-orange" : "border-white/10"
-                    } text-white placeholder:text-white/50`}
-                  />
-                  {errors.stakeAmount && (
-                    <p className="text-web3-orange text-sm mt-1">{errors.stakeAmount}</p>
-                  )}
-                  <p className="text-xs text-blue-300 mt-1">
-                    Funds will be deducted from your CodeStake wallet balance
-                  </p>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label className="text-white flex items-center">
-                    <Users className="h-4 w-4 mr-2 text-web3-blue" />
-                    Challenge Participants
-                  </Label>
-                  {participants.length < 2 && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={addParticipant}
-                      disabled={isSubmitting}
-                      className="text-web3-blue"
-                    >
-                      <PlusCircle className="h-4 w-4 mr-1" /> Add Participant
-                    </Button>
-                  )}
-                </div>
-
-                <div className="space-y-3">
-                  {participants.map((participant, index) => (
-                    <div key={index} className="flex gap-2">
-                      <div className="flex-1">
-                        <Input
-                          value={participant}
-                          onChange={(e) => updateParticipant(index, e.target.value)}
-                          placeholder="0x... (Ethereum Address)"
-                          disabled={isSubmitting}
-                          className={`bg-web3-card border ${
-                            errors.participants[index] ? "border-web3-orange" : "border-white/10"
-                          } text-white placeholder:text-white/50`}
-                        />
-                        {errors.participants[index] && (
-                          <p className="text-web3-orange text-sm mt-1">
-                            {errors.participants[index]}
-                          </p>
-                        )}
-                      </div>
-                      {index > 0 && (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="icon"
-                          onClick={() => removeParticipant(index)}
-                          disabled={isSubmitting}
-                          className="text-web3-orange"
-                        >
-                          <span className="sr-only">Remove</span>
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            width="24"
-                            height="24"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            className="h-4 w-4"
-                          >
-                            <path d="M18 6 6 18"></path>
-                            <path d="m6 6 12 12"></path>
-                          </svg>
-                        </Button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="track" className="text-white flex items-center">
-                  <BookOpen className="h-4 w-4 mr-2 text-web3-blue" />
-                  Select Track
-                </Label>
-                <Select
-                  value={selectedTrack}
-                  onValueChange={setSelectedTrack}
-                  disabled={isSubmitting}
-                >
-                  <SelectTrigger
-                    className={`bg-web3-card border ${
-                      errors.track ? "border-web3-orange" : "border-white/10"
-                    } text-white`}
-                  >
-                    <SelectValue placeholder="Select a track" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-web3-card border border-white/10 text-white">
-                    {TRACKS.map((track) => (
-                      <SelectItem
-                        key={track.id}
-                        value={track.id}
-                        className="focus:bg-white/10 focus:text-white"
-                      >
-                        {track.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {errors.track && (
-                  <p className="text-web3-orange text-sm mt-1">{errors.track}</p>
-                )}
-              </div>
-
-              <div className="flex justify-end space-x-4 pt-4">
-                <Button
-                  variant="outline"
-                  onClick={toggleForm}
-                  disabled={isSubmitting}
-                  className="border-white/20 hover:bg-white/5"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={handleSubmit}
-                  disabled={isSubmitting || !!networkError || !contractValid}
-                  className="relative group overflow-hidden transition-all duration-300 transform hover:scale-105 hover:shadow-[0_0_25px_rgba(248,161,0,0.3)]"
-                  style={{
-                    background: "linear-gradient(135deg, #4A90E2 0%, #F8A100 100%)",
-                  }}
-                >
-                  <div className="absolute inset-0 w-full h-full bg-white/10 opacity-0 group-hover:opacity-20 transition-opacity duration-300"></div>
-                  <Sparkles className="mr-2 h-5 w-5" />
-                  {isSubmitting ? "Creating..." : "Create Challenge"}
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-    </section>
+          </Button>
+        </form>
+      </CardContent>
+    </Card>
   );
 };
 

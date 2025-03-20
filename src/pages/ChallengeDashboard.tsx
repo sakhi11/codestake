@@ -1,17 +1,13 @@
-
-import React, { useEffect, useState } from "react";
-import { ethers } from "ethers";
-import { useWeb3 } from "@/context/Web3Provider";
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/Card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/Button";
-import { Separator } from "@/components/ui/separator";
+import React, { useState, useEffect } from "react";
 import DashboardNavbar from "@/components/layout/DashboardNavbar";
-import { toast } from "sonner";
 import Footer from "@/components/layout/Footer";
+import { ethers } from "ethers";
+import { useNavigate } from "react-router-dom";
+import { useWeb3 } from "@/context/Web3Provider";
 import QuizModal from "@/components/quiz/QuizModal";
-import { Trophy, Zap, Calendar, CheckCircle, XCircle, AlertCircle } from "lucide-react";
-import { EDU_CHAIN_CONFIG, handleContractError, switchToEduChain } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { toast } from "sonner";
 
 interface MilestoneItem {
   id: number;

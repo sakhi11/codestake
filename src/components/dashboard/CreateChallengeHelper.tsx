@@ -1,97 +1,109 @@
-
 import React from 'react';
-import { ethers } from 'ethers';
-import { useContractDebugger } from '@/hooks/useContractDebugger';
 import { Button } from "@/components/ui/button";
-import { Lightbulb } from 'lucide-react';
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { useContractDebugger } from "@/hooks/useContractDebugger";
 
-interface CreateChallengeHelperProps {
+interface Props {
+  player1: string;
+  player2: string;
   stakeAmount: string;
-  participants: string[];
-  onDebugLog: (log: any) => void;
+  track: string;
+  setPlayer1: (player1: string) => void;
+  setPlayer2: (player2: string) => void;
+  setStakeAmount: (stakeAmount: string) => void;
+  setTrack: (track: string) => void;
+  onCreateChallenge: (challengeDetails: {
+    player1: string;
+    player2: string;
+    stakeAmount: string;
+    track: string;
+  }) => Promise<void>;
+  isSubmitting: boolean;
 }
 
-/**
- * A component to help debug contract interactions for the CreateChallenge component
- */
-const CreateChallengeHelper: React.FC<CreateChallengeHelperProps> = ({
+const CreateChallengeHelper: React.FC<Props> = ({
+  player1,
+  player2,
   stakeAmount,
-  participants,
-  onDebugLog
+  track,
+  setPlayer1,
+  setPlayer2,
+  setStakeAmount,
+  setTrack,
+  onCreateChallenge,
+  isSubmitting,
 }) => {
-  const { debugTransaction, isBusy, lastError, lastDebugLog } = useContractDebugger();
-
-  const handleDebug = async () => {
-    // Validate inputs
-    if (!stakeAmount || isNaN(Number(stakeAmount)) || Number(stakeAmount) <= 0) {
-      onDebugLog({
-        error: 'Invalid stake amount',
-        details: 'Please enter a valid stake amount'
-      });
-      return;
-    }
-    
-    if (!participants.length || !participants[0]) {
-      onDebugLog({
-        error: 'No participants',
-        details: 'Please add at least one participant'
-      });
-      return;
-    }
-    
-    // Filter valid participants
-    const validParticipants = participants.filter(p => 
-      p && ethers.isAddress(p)
-    );
-    
-    if (validParticipants.length === 0) {
-      onDebugLog({
-        error: 'No valid participants',
-        details: 'Please add at least one valid Ethereum address'
-      });
-      return;
-    }
-    
-    // Setup parameters for createChallenge function
-    const stakeInWei = ethers.parseEther(stakeAmount);
-    const totalPlayers = validParticipants.length;
-    
-    // Create milestone timestamps
-    const now = Math.floor(Date.now() / 1000);
-    const milestoneTimestamps = [
-      now + 86400, // 1 day from now
-      now + 172800, // 2 days from now
-      now + 259200, // 3 days from now
-    ];
-
-    // Debug the transaction
-    const result = await debugTransaction(
-      'createChallenge',
-      [stakeInWei, totalPlayers, validParticipants, milestoneTimestamps],
-      { value: stakeInWei }
-    );
-    
-    onDebugLog(result);
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await onCreateChallenge({ player1, player2, stakeAmount, track });
   };
 
   return (
-    <div className="mt-3">
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        onClick={handleDebug}
-        disabled={isBusy}
-        className="text-amber-400 border-amber-400 hover:bg-amber-400/10"
-      >
-        <Lightbulb className="h-4 w-4 mr-1" />
-        Debug Contract Interaction
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div>
+        <Label htmlFor="player1">Player 1 Address</Label>
+        <Input
+          type="text"
+          id="player1"
+          value={player1}
+          onChange={(e) => setPlayer1(e.target.value)}
+          placeholder="0x..."
+          required
+        />
+      </div>
+      <div>
+        <Label htmlFor="player2">Player 2 Address</Label>
+        <Input
+          type="text"
+          id="player2"
+          value={player2}
+          onChange={(e) => setPlayer2(e.target.value)}
+          placeholder="0x..."
+          required
+        />
+      </div>
+      <div>
+        <Label htmlFor="stakeAmount">Stake Amount (ETH)</Label>
+        <Input
+          type="number"
+          id="stakeAmount"
+          value={stakeAmount}
+          onChange={(e) => setStakeAmount(e.target.value)}
+          placeholder="0.1"
+          required
+        />
+      </div>
+      <div>
+        <Label htmlFor="track">Track</Label>
+        <Input
+          type="text"
+          id="track"
+          value={track}
+          onChange={(e) => setTrack(e.target.value)}
+          placeholder="e.g., Web Development"
+          required
+        />
+      </div>
+      <Button type="submit" disabled={isSubmitting} variant="gradient" className="w-full">
+        {isSubmitting ? "Creating Challenge..." : "Create Challenge"}
       </Button>
-      {lastError && (
-        <div className="mt-2 text-xs text-amber-400">
-          <p>Last error: {lastError}</p>
-        </div>
-      )}
+      <DebugInfo />
+    </form>
+  );
+};
+
+export const DebugInfo = () => {
+  const { isDebugMode, networkStatus } = useContractDebugger();
+  
+  if (!isDebugMode) return null;
+  
+  return (
+    <div className="mt-4 p-3 border border-orange-400 bg-orange-100/10 rounded-md">
+      <h3 className="font-medium text-orange-500">Debug Information</h3>
+      <p className="text-sm text-orange-400">Network: {networkStatus.networkName}</p>
+      <p className="text-sm text-orange-400">Chain ID: {networkStatus.chainId || 'Unknown'}</p>
+      <p className="text-sm text-orange-400">Network Status: {networkStatus.isCorrectNetwork ? 'Connected to eduChain' : 'Not on eduChain'}</p>
     </div>
   );
 };
