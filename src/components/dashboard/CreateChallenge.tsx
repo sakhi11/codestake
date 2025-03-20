@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { ethers } from "ethers";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -23,7 +22,6 @@ import {
   safeContractCall
 } from "@/lib/utils";
 
-// Track options for the challenge
 const TRACKS = [
   { id: "javascript", name: "JavaScript" },
   { id: "solidity", name: "Solidity" },
@@ -32,13 +30,11 @@ const TRACKS = [
   { id: "react", name: "React" },
 ];
 
-// Function to validate contract state before making calls
 const validateContractState = (contract) => {
   if (!contract) {
     return { valid: false, error: "Contract not initialized. Please reconnect your wallet." };
   }
   
-  // Check if createChallenge method exists on the contract
   if (!contract.createChallenge) {
     return { 
       valid: false, 
@@ -53,19 +49,18 @@ const CreateChallenge = () => {
   const { contract, wallet, isConnected } = useWeb3();
   const [isExpanded, setIsExpanded] = useState(false);
   const [stakeAmount, setStakeAmount] = useState("");
-  const [participants, setParticipants] = useState<string[]>([""]); // Initial empty participant
+  const [participants, setParticipants] = useState<string[]>([""]);
   const [selectedTrack, setSelectedTrack] = useState("");
   const [errors, setErrors] = useState({
     stakeAmount: "",
     participants: [""],
     track: "",
   });
-  const [isSubmitting, setIsSubmitting] = useState(false); // Track submission status
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [networkError, setNetworkError] = useState<string | null>(null);
   const [debugInfo, setDebugInfo] = useState<string | null>(null);
   const [contractValid, setContractValid] = useState(true);
 
-  // Check if we're on the correct network on component mount and when wallet changes
   useEffect(() => {
     const checkNetwork = async () => {
       if (isConnected) {
@@ -80,7 +75,6 @@ const CreateChallenge = () => {
     
     checkNetwork();
     
-    // Also validate contract when it changes
     if (contract) {
       const validation = validateContractState(contract);
       setContractValid(validation.valid);
@@ -90,7 +84,6 @@ const CreateChallenge = () => {
     }
   }, [isConnected, wallet, contract]);
 
-  // Toggle the form visibility
   const toggleForm = () => {
     setIsExpanded(!isExpanded);
     if (isExpanded) {
@@ -98,7 +91,6 @@ const CreateChallenge = () => {
     }
   };
 
-  // Reset the form to its initial state
   const resetForm = () => {
     setStakeAmount("");
     setParticipants([""]);
@@ -112,9 +104,8 @@ const CreateChallenge = () => {
     setDebugInfo(null);
   };
 
-  // Add a new participant input field
   const addParticipant = () => {
-    if (participants.length < 4) { // Max 5 participants (including creator)
+    if (participants.length < 4) {
       setParticipants([...participants, ""]);
       setErrors({
         ...errors,
@@ -123,7 +114,6 @@ const CreateChallenge = () => {
     }
   };
 
-  // Remove a participant input field
   const removeParticipant = (index: number) => {
     const updatedParticipants = [...participants];
     updatedParticipants.splice(index, 1);
@@ -137,7 +127,6 @@ const CreateChallenge = () => {
     });
   };
 
-  // Update a participant's address
   const updateParticipant = (index: number, value: string) => {
     const updatedParticipants = [...participants];
     updatedParticipants[index] = value;
@@ -153,7 +142,6 @@ const CreateChallenge = () => {
     }
   };
 
-  // Validate the form fields
   const validateForm = () => {
     let valid = true;
     const newErrors = {
@@ -162,7 +150,6 @@ const CreateChallenge = () => {
       track: "",
     };
 
-    // Validate stake amount
     if (!stakeAmount) {
       newErrors.stakeAmount = "Stake amount is required";
       valid = false;
@@ -171,7 +158,6 @@ const CreateChallenge = () => {
       valid = false;
     }
 
-    // Validate participant addresses
     participants.forEach((participant, index) => {
       if (!participant) {
         newErrors.participants[index] = "Wallet address is required";
@@ -182,7 +168,6 @@ const CreateChallenge = () => {
       }
     });
 
-    // Validate track selection
     if (!selectedTrack) {
       newErrors.track = "Please select a track";
       valid = false;
@@ -192,7 +177,6 @@ const CreateChallenge = () => {
     return valid;
   };
 
-  // Handle switching to eduChain network
   const handleSwitchNetwork = async () => {
     toast.loading("Switching to eduChain network...");
     try {
@@ -214,11 +198,9 @@ const CreateChallenge = () => {
     }
   };
 
-  // Handle form submission with blockchain interaction and better error handling
   const handleSubmit = async () => {
     if (!validateForm()) return;
     
-    // Check network before proceeding
     const chainId = await getCurrentChainId();
     if (chainId && chainId !== EDU_CHAIN_CONFIG.chainId) {
       toast.error(`Please connect to eduChain Testnet (Chain ID: ${EDU_CHAIN_CONFIG.chainId})`);
@@ -226,7 +208,6 @@ const CreateChallenge = () => {
       if (!switched) return;
     }
 
-    // Validate contract state
     const contractStatus = validateContractState(contract);
     if (!contractStatus.valid) {
       toast.error(contractStatus.error);
@@ -242,11 +223,9 @@ const CreateChallenge = () => {
         throw new Error("No wallet found. Please install MetaMask.");
       }
 
-      // Convert stake amount to wei - use a lower amount for testing if needed
       let stakeInWei;
       try {
         stakeInWei = ethers.parseEther(stakeAmount);
-        // If the stake is too high, this can cause issues
         if (stakeInWei > ethers.parseEther("0.01")) {
           setDebugInfo("Warning: High stake amounts may cause transaction failures. Consider using a smaller amount (0.001-0.01 EDU) for testing.");
         }
@@ -257,23 +236,19 @@ const CreateChallenge = () => {
         return;
       }
 
-      // Filter out empty participants and ensure unique addresses
       const validParticipants = [...new Set(participants.filter(p => p))];
       
-      // Set total players to the count of participants (already includes the creator)
       const totalPlayers = validParticipants.length;
       
-      // Create milestone timestamps (for simplicity, just using future timestamps)
       const now = Math.floor(Date.now() / 1000);
       const milestoneTimestamps = [
-        now + 86400, // 1 day from now
-        now + 172800, // 2 days from now
-        now + 259200, // 3 days from now
+        now + 86400,
+        now + 172800,
+        now + 259200,
       ];
 
       toast.loading("Creating challenge...");
 
-      // Debug logging
       console.log("Calling contract with params:", {
         stakeInWei: stakeInWei.toString(),
         totalPlayers,
@@ -282,33 +257,37 @@ const CreateChallenge = () => {
         track: selectedTrack,
       });
       
-      console.log("Contract methods available:", Object.keys(contract));
+      console.log("Contract methods available:", Object.keys(contract || {}));
       
-      // Use our safe contract call helper
-      const result = await safeContractCall(
-        contract,
-        "createChallenge",
-        [
+      if (!contract) {
+        throw new Error("Contract is not initialized");
+      }
+      
+      if (!contract.createChallenge) {
+        throw new Error("Contract method 'createChallenge' is not available. Please make sure you're connected to eduChain Testnet.");
+      }
+      
+      try {
+        const tx = await contract.createChallenge(
           stakeInWei, 
           totalPlayers,
           validParticipants, 
-          milestoneTimestamps
-        ],
-        { 
-          value: stakeInWei // Send EDU tokens with the transaction
-        }
-      );
-      
-      if (result.success) {
+          milestoneTimestamps,
+          { 
+            value: stakeInWei
+          }
+        );
+        
+        const receipt = await tx.wait();
         toast.success("Challenge created successfully!");
-        console.log("Challenge created successfully. Tx hash:", result.result.hash);
+        console.log("Challenge created successfully. Tx hash:", receipt.hash);
 
-        // Reset form and collapse on success
         resetForm();
         setIsExpanded(false);
-      } else {
-        toast.error(result.error || "Transaction failed");
-        setDebugInfo(result.error || "Unknown error occurred");
+      } catch (callError) {
+        const errorMessage = handleContractError(callError);
+        toast.error(errorMessage);
+        setDebugInfo(`Direct contract call error: ${errorMessage}`);
       }
     } catch (error: any) {
       console.error("Error creating challenge:", error);
@@ -321,7 +300,6 @@ const CreateChallenge = () => {
     }
   };
 
-  // Create a button to switch networks if needed
   const SwitchNetworkButton = () => {
     if (!networkError) return null;
     
@@ -335,7 +313,6 @@ const CreateChallenge = () => {
     );
   };
 
-  // Display debug information if available
   const DebugInfo = () => {
     if (!debugInfo) return null;
     
@@ -353,7 +330,6 @@ const CreateChallenge = () => {
     );
   };
 
-  // Helper component for transaction guidance
   const TransactionGuidance = () => {
     return (
       <div className="bg-blue-500/20 border border-blue-400 p-3 rounded-md mb-4">
@@ -416,7 +392,6 @@ const CreateChallenge = () => {
             <TransactionGuidance />
 
             <div className="space-y-6">
-              {/* Stake Amount */}
               <div className="space-y-2">
                 <Label htmlFor="stake-amount" className="text-white">
                   Stake Amount (EDU)
@@ -442,7 +417,6 @@ const CreateChallenge = () => {
                 </div>
               </div>
 
-              {/* Participants */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <Label className="text-white flex items-center">
@@ -514,7 +488,6 @@ const CreateChallenge = () => {
                 </div>
               </div>
 
-              {/* Track Selection */}
               <div className="space-y-2">
                 <Label htmlFor="track" className="text-white flex items-center">
                   <BookOpen className="h-4 w-4 mr-2 text-web3-blue" />
@@ -549,7 +522,6 @@ const CreateChallenge = () => {
                 )}
               </div>
 
-              {/* Action Buttons */}
               <div className="flex justify-end space-x-4 pt-4">
                 <Button
                   variant="outline"

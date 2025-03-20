@@ -1,22 +1,21 @@
 
 import React from "react";
 import { useNavigate } from "react-router-dom";
-import { Button } from "../ui/Button";
+import { Button } from "../ui/button";
 import { Wallet, ChevronRight } from "lucide-react";
-import { Scene3D } from "../3d/Scene3D";
 
 const Hero = () => {
   const navigate = useNavigate();
 
   return (
     <section className="min-h-screen relative flex items-center justify-center overflow-hidden">
-      <Scene3D />
+      <div className="absolute inset-0 bg-gradient-to-br from-black via-purple-950 to-black"></div>
       
       <div className="container mx-auto px-4 py-12 relative z-10">
         <div className="max-w-3xl mx-auto text-center">
           <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 text-white animate-fade-in">
-            Level Up Your <span className="text-gradient">Learning Journey</span><br/> 
-            With <span className="text-web3-blue">Smart Contracts</span>
+            <span className="text-gradient">Stake</span>, Learn, and <span className="text-web3-blue">Win</span><br/> 
+            With <span className="text-web3-orange">Smart Contracts</span>
           </h1>
           
           <p className="text-xl md:text-2xl text-white/80 mb-10 leading-relaxed animate-fade-in">

@@ -142,9 +142,10 @@ export async function getContract() {
     const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
     
     // Verify contract methods
-    console.log('Available contract methods:', Object.keys(contract.interface.functions));
+    console.log('Available contract methods:', Object.keys(contract));
     
-    if (!contract.interface.functions['createChallenge(uint256,uint256,address[],uint256[])']) {
+    // Changed this check to work with ethers v6
+    if (!contract.createChallenge) {
       throw new Error('Contract interface is incomplete. Please check network connection.');
     }
     
@@ -294,7 +295,7 @@ export async function safeContractCall(contract: ethers.Contract, method: string
     }
     
     // Log available methods for debugging
-    console.log("Available contract methods:", Object.keys(contract));
+    console.log("Available contract methods:", Object.keys(contract || {}));
     
     // First, make sure we're on the right network
     const isOnCorrectNetwork = await isOnEduChain();
