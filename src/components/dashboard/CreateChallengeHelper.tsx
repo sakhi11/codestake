@@ -35,7 +35,7 @@ const CreateChallengeHelper: React.FC<Props> = ({
   setTrack,
   onCreateChallenge,
   isSubmitting,
-  walletBalance,  // Receive wallet balance
+  walletBalance,
 }) => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

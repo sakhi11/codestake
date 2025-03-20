@@ -9,10 +9,10 @@ import {
   CardFooter, 
   CardHeader, 
   CardTitle 
-} from "@/components/ui/card"; // Fixed casing to lowercase
+} from "@/components/ui/card"; 
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button"; // Fixed casing to lowercase
+import { Button } from "@/components/ui/button"; 
 import { useWeb3 } from "@/context/Web3Provider";
 import { Loader2 } from "lucide-react";
 

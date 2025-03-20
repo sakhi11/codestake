@@ -1,5 +1,3 @@
-
-// Web3Provider.tsx
 'use client'; // For Next.js client-side only
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { ethers } from "ethers";
@@ -9,7 +7,7 @@ import { EDU_CHAIN_CONFIG } from "@/lib/utils";
 // Using the ABI from the stake_contract.sol
 const CONTRACT_ADDRESS = "0x5b4050c163Fb24522Fa25876b8F6A983a69D9165";
 const ABI = [
-  // Only include functions we'll actually use
+  // Match the actual functions in stake_contract.sol
   "function getChallengeDetails(uint256 _challengeId) view returns (address creator, uint256 totalStake, uint256 totalPlayers, uint256 joinedCount, uint256 balance, uint256 milestoneCount)",
   "function createChallenge(uint256 _totalStake, uint256 _totalPlayers, address[] _allowedParticipants, uint256[] _milestoneTimestamps) payable",
   "function joinChallenge(uint256 _challengeId) payable",

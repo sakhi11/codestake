@@ -220,14 +220,22 @@ const Dashboard = () => {
       
       toast.loading("Creating challenge...");
 
+      // Calculate 30 days from now for milestone timestamps (for simplicity, all at once)
+      const thirtyDaysFromNow = Math.floor(Date.now() / 1000) + (30 * 24 * 60 * 60);
+      const milestoneTimestamps = [
+        thirtyDaysFromNow,
+        thirtyDaysFromNow,
+        thirtyDaysFromNow,
+        thirtyDaysFromNow
+      ];
+
+      // Match the contract's expected parameters
       const tx = await contract.createChallenge(
-        "Learning Challenge", // name
-        newChallenge.track,  // track
-        60 * 60 * 24 * 30,   // duration (30 days)
-        [newChallenge.player1, newChallenge.player2], // participants
-        ["Week 1", "Week 2", "Week 3", "Week 4"], // milestone names
-        [stakeInWei / BigInt(4), stakeInWei / BigInt(4), stakeInWei / BigInt(4), stakeInWei / BigInt(4)], // rewards
-        stakeInWei // stake amount
+        stakeInWei,  // total stake
+        2,  // total players (hardcoded to 2 for now)
+        [newChallenge.player1, newChallenge.player2],  // participants
+        milestoneTimestamps, // milestone timestamps
+        { value: stakeInWei }  // Send ETH with transaction
       );
 
       const receipt = await tx.wait();
