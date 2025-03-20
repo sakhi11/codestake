@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { ethers } from "ethers";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,7 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { PlusCircle, Sparkles, Users, BookOpen, Calendar, AlertCircle } from "lucide-react";
+import { PlusCircle, Sparkles, Users, BookOpen, Calendar, AlertCircle, Wallet } from "lucide-react";
 import { useWeb3 } from "@/context/Web3Provider";
 import { toast } from "sonner";
 import { 
@@ -21,6 +22,7 @@ import {
   switchToEduChain,
   safeContractCall
 } from "@/lib/utils";
+import { Link } from "react-router-dom";
 
 const TRACKS = [
   { id: "javascript", name: "JavaScript" },
@@ -45,7 +47,7 @@ const validateContractState = (contract) => {
   return { valid: true };
 };
 
-const CreateChallenge = () => {
+const CreateChallenge = ({ onCreateChallenge, walletBalance = "0" }) => {
   const { contract, wallet, isConnected } = useWeb3();
   const [isExpanded, setIsExpanded] = useState(false);
   const [stakeAmount, setStakeAmount] = useState("");
@@ -156,6 +158,20 @@ const CreateChallenge = () => {
     } else if (isNaN(Number(stakeAmount)) || Number(stakeAmount) <= 0) {
       newErrors.stakeAmount = "Please enter a valid amount";
       valid = false;
+    } else {
+      // Check if stake amount exceeds wallet balance
+      try {
+        const stakeInWei = ethers.parseEther(stakeAmount);
+        const balanceInWei = ethers.parseEther(walletBalance);
+        
+        if (stakeInWei > balanceInWei) {
+          newErrors.stakeAmount = "Insufficient balance. Please deposit funds first.";
+          valid = false;
+        }
+      } catch (e) {
+        newErrors.stakeAmount = "Invalid amount format";
+        valid = false;
+      }
     }
 
     participants.forEach((participant, index) => {
@@ -223,72 +239,16 @@ const CreateChallenge = () => {
         throw new Error("No wallet found. Please install MetaMask.");
       }
 
-      let stakeInWei;
-      try {
-        stakeInWei = ethers.parseEther(stakeAmount);
-        if (stakeInWei > ethers.parseEther("0.01")) {
-          setDebugInfo("Warning: High stake amounts may cause transaction failures. Consider using a smaller amount (0.001-0.01 EDU) for testing.");
-        }
-      } catch (parseError) {
-        console.error("Error parsing stake amount:", parseError);
-        toast.error("Invalid stake amount. Please check your input.");
-        setIsSubmitting(false);
-        return;
-      }
-
-      const validParticipants = [...new Set(participants.filter(p => p))];
-      
-      const totalPlayers = validParticipants.length;
-      
-      const now = Math.floor(Date.now() / 1000);
-      const milestoneTimestamps = [
-        now + 86400,
-        now + 172800,
-        now + 259200,
-      ];
-
-      toast.loading("Creating challenge...");
-
-      console.log("Calling contract with params:", {
-        stakeInWei: stakeInWei.toString(),
-        totalPlayers,
-        validParticipants,
-        milestoneTimestamps,
-        track: selectedTrack,
+      // Submit challenge to the parent component
+      onCreateChallenge({
+        player1: participants[0],
+        player2: participants.length > 1 ? participants[1] : wallet,
+        stakeAmount: stakeAmount,
+        track: selectedTrack
       });
-      
-      console.log("Contract methods available:", Object.keys(contract || {}));
-      
-      if (!contract) {
-        throw new Error("Contract is not initialized");
-      }
-      
-      if (!contract.createChallenge) {
-        throw new Error("Contract method 'createChallenge' is not available. Please make sure you're connected to eduChain Testnet.");
-      }
-      
-      try {
-        const tx = await contract.createChallenge(
-          stakeInWei, 
-          totalPlayers,
-          validParticipants, 
-          milestoneTimestamps,
-          { 
-            value: stakeInWei
-          }
-        );
-        
-        const receipt = await tx.wait();
-        toast.success("Challenge created successfully!");
-        console.log("Challenge created successfully. Tx hash:", receipt.hash);
 
-        resetForm();
-        setIsExpanded(false);
-      } catch (callError) {
-        const errorMessage = handleContractError(callError);
-        toast.error(errorMessage);
-        setDebugInfo(`Direct contract call error: ${errorMessage}`);
-      }
+      resetForm();
+      setIsExpanded(false);
     } catch (error: any) {
       console.error("Error creating challenge:", error);
       const errorMessage = handleContractError(error);
@@ -296,7 +256,6 @@ const CreateChallenge = () => {
       setDebugInfo(errorMessage);
     } finally {
       setIsSubmitting(false);
-      toast.dismiss();
     }
   };
 
@@ -323,26 +282,29 @@ const CreateChallenge = () => {
           <h4 className="font-bold">Debug Information</h4>
         </div>
         <p className="whitespace-pre-wrap">{debugInfo}</p>
-        <p className="mt-2 text-yellow-400">
-          Suggestion: Try reducing the stake amount to 0.001-0.01 EDU. The contract may have limitations on transaction size.
-        </p>
       </div>
     );
   };
 
-  const TransactionGuidance = () => {
+  const BalanceInfo = () => {
     return (
       <div className="bg-blue-500/20 border border-blue-400 p-3 rounded-md mb-4">
-        <h4 className="font-semibold text-blue-200 flex items-center">
-          <Sparkles className="h-4 w-4 mr-2" />
-          Tips for Successful Transactions
-        </h4>
-        <ul className="text-xs text-blue-100 mt-2 space-y-1 list-disc pl-4">
-          <li>Start with small stake amounts (e.g. 0.001-0.01 EDU) for testing</li>
-          <li>Ensure you have enough EDU tokens for gas fees plus your stake</li>
-          <li>Verify you're connected to eduChain Testnet (Chain ID: 0xa045c)</li>
-          <li>Complex transactions may sometimes fail due to gas limitations</li>
-        </ul>
+        <div className="flex justify-between items-center">
+          <div>
+            <h4 className="font-semibold text-blue-200 flex items-center">
+              <Wallet className="h-4 w-4 mr-2" />
+              Available Balance
+            </h4>
+            <div className="mt-1 text-white text-xl font-bold">
+              {parseFloat(walletBalance).toFixed(4)} <span className="text-sm">EDU</span>
+            </div>
+          </div>
+          <Link to="/balance">
+            <Button variant="outline" size="sm" className="text-blue-200 border-blue-400 hover:bg-blue-500/30">
+              Add Funds
+            </Button>
+          </Link>
+        </div>
       </div>
     );
   };
@@ -389,7 +351,7 @@ const CreateChallenge = () => {
 
             {debugInfo && <DebugInfo />}
             
-            <TransactionGuidance />
+            <BalanceInfo />
 
             <div className="space-y-6">
               <div className="space-y-2">
@@ -412,7 +374,7 @@ const CreateChallenge = () => {
                     <p className="text-web3-orange text-sm mt-1">{errors.stakeAmount}</p>
                   )}
                   <p className="text-xs text-blue-300 mt-1">
-                    Recommended: Use small amounts (0.001-0.01 EDU) for testing
+                    Funds will be deducted from your CodeStake wallet balance
                   </p>
                 </div>
               </div>

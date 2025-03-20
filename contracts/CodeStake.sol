@@ -1,3 +1,4 @@
+
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
@@ -91,12 +92,18 @@ contract CodeStake is Ownable, ReentrancyGuard, Pausable {
         uint256 duration,
         address[] memory participants,
         string[] memory milestoneNames,
-        uint256[] memory milestoneRewards
-    ) external payable whenNotPaused nonReentrant {
-        require(msg.value > 0, "Stake required");
+        uint256[] memory milestoneRewards,
+        uint256 stakeAmount
+    ) external whenNotPaused nonReentrant {
+        // Check that user has enough balance instead of requiring ETH with msg.value
+        require(stakeAmount > 0, "Stake required");
+        require(walletSummaries[msg.sender].balance >= stakeAmount, "Insufficient balance");
         require(participants.length > 0, "Participants required");
         require(milestoneNames.length == milestoneRewards.length, "Invalid milestone config");
 
+        // Deduct from user's balance
+        walletSummaries[msg.sender].balance -= stakeAmount;
+        
         uint256 challengeId = challengeCounter++;
         uint256 startDate = block.timestamp;
         uint256 endDate = startDate + duration;
@@ -107,8 +114,8 @@ contract CodeStake is Ownable, ReentrancyGuard, Pausable {
         newChallenge.creator = msg.sender;
         newChallenge.startDate = startDate;
         newChallenge.endDate = endDate;
-        newChallenge.stakedAmount = msg.value;
-        newChallenge.totalStake = msg.value;
+        newChallenge.stakedAmount = stakeAmount; 
+        newChallenge.totalStake = stakeAmount;
         newChallenge.participants = participants;
         newChallenge.isActive = true;
 
@@ -129,12 +136,12 @@ contract CodeStake is Ownable, ReentrancyGuard, Pausable {
         _recordTransaction(
             msg.sender,
             "staked",
-            msg.value,
+            stakeAmount,
             string.concat("Staked for challenge: ", name)
         );
 
-        // Update wallet summary
-        walletSummaries[msg.sender].totalStaked += msg.value;
+        // Update wallet summary - still track total staked for statistics
+        walletSummaries[msg.sender].totalStaked += stakeAmount;
 
         emit ChallengeCreated(challengeId, name, msg.sender);
     }
@@ -327,4 +334,4 @@ contract CodeStake is Ownable, ReentrancyGuard, Pausable {
     fallback() external payable {
         deposit();
     }
-} 
+}

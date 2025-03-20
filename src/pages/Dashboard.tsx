@@ -59,6 +59,7 @@ const Dashboard = () => {
     milestonesCompleted: 0,
   });
   const [isLoading, setIsLoading] = useState(false);
+  const [walletBalance, setWalletBalance] = useState("0");
 
   useEffect(() => {
     console.log("Wallet:", wallet);
@@ -69,11 +70,27 @@ const Dashboard = () => {
   useEffect(() => {
     const init = async () => {
       if (wallet) {
+        await fetchWalletBalance();
         await fetchChallenges();
       }
     };
     init();
   }, [wallet]);
+
+  const fetchWalletBalance = async () => {
+    if (!contract || !wallet) {
+      return;
+    }
+
+    try {
+      const walletSummary = await contract.getWalletSummary(wallet);
+      if (walletSummary) {
+        setWalletBalance(ethers.formatEther(walletSummary.balance || 0n));
+      }
+    } catch (error) {
+      console.error("Error fetching wallet balance:", error);
+    }
+  };
 
   const fetchChallenges = async () => {
     if (!contract || !wallet) {
@@ -183,21 +200,31 @@ const Dashboard = () => {
     try {
       const stakeInWei = ethers.parseEther(newChallenge.stakeAmount);
       
+      // Check if user has enough balance
+      const userBalance = ethers.parseEther(walletBalance);
+      if (userBalance < stakeInWei) {
+        toast.error(`Insufficient balance. Please deposit funds in the Balance section.`);
+        return;
+      }
+      
       toast.loading("Creating challenge...");
 
+      // Updated to use the new contract method (no value being sent)
       const tx = await contract.createChallenge(
-        newChallenge.player1,
-        newChallenge.player2,
-        newChallenge.track,
-        {
-          value: stakeInWei,
-        }
+        "Learning Challenge", // name
+        newChallenge.track,  // track
+        60 * 60 * 24 * 30,   // duration (30 days)
+        [newChallenge.player1, newChallenge.player2], // participants
+        ["Week 1", "Week 2", "Week 3", "Week 4"], // milestone names
+        [stakeInWei / BigInt(4), stakeInWei / BigInt(4), stakeInWei / BigInt(4), stakeInWei / BigInt(4)], // rewards
+        stakeInWei // stake amount
       );
 
       const receipt = await tx.wait();
       
       if (receipt.status === 1) {
         toast.success("Challenge created successfully!");
+        await fetchWalletBalance(); // Refresh wallet balance
         await fetchChallenges();
       } else {
         toast.error("Transaction failed. Please try again.");
@@ -230,7 +257,7 @@ const Dashboard = () => {
       <DashboardNavbar address={wallet} />
       <main className="container mx-auto px-4 py-8 mt-16">
         <WalletSummary />
-        <CreateChallenge />
+        <CreateChallenge onCreateChallenge={handleCreateChallenge} walletBalance={walletBalance} />
         <OngoingChallenges 
           challenges={ongoingChallenges}
         />
