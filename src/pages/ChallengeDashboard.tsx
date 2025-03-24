@@ -182,10 +182,12 @@ const ChallengeDashboard = () => {
     setIsQuizModalOpen(true);
   };
 
-  const handleQuizSubmit = (code: string) => {
+  const handleQuizSubmit = async (code: string) => {
     console.log("Quiz submitted with code:", code);
-    // Implementation for quiz submission
-    setIsQuizModalOpen(false);
+    const result = await completeMilestone(code);
+    if (result) {
+      setIsQuizModalOpen(false);
+    }
   };
 
   const handleSwitchNetwork = async () => {
