@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { useWeb3 } from "@/context/Web3Provider";
 import { useChallenge } from "@/hooks/useChallenge";
@@ -39,7 +40,7 @@ const OngoingChallenges = () => {
     };
 
     fetchActiveChallenges();
-  }, [isConnected, getActiveChallenges, toast]);
+  }, [isConnected, getActiveChallenges]);
 
   useEffect(() => {
     const fetchChallengeDetails = async () => {
@@ -64,7 +65,7 @@ const OngoingChallenges = () => {
     };
 
     fetchChallengeDetails();
-  }, [activeChallengeIds, getChallengeDetails, challenges, toast]);
+  }, [activeChallengeIds, getChallengeDetails, challenges]);
 
   const navigateToChallenge = (challengeId: number) => {
     navigate(`/challenges/${challengeId}`);
@@ -76,10 +77,10 @@ const OngoingChallenges = () => {
         const challenge = challenges[challengeId];
         if (!challenge) return null;
 
-        const stakeProgress = (challenge.stakedAmount / challenge.totalStake) * 100;
+        const stakeProgress = (parseFloat(challenge.stakedAmount) / parseFloat(challenge.totalStake)) * 100;
 
         return (
-          <Card key={challengeId} variant="hover">
+          <Card key={challengeId} className="border border-white/10 bg-web3-card hover:scale-[1.02] transition-transform duration-300 hover:shadow-[0_0_15px_rgba(74,144,226,0.15)]">
             <CardHeader>
               <CardTitle>{challenge.name}</CardTitle>
               <CardDescription>Track: {challenge.track}</CardDescription>

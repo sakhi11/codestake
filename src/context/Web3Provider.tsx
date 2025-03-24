@@ -1,16 +1,17 @@
+
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { ethers } from "ethers";
 import { EDU_CHAIN_CONFIG } from "@/lib/utils";
 
 interface Web3ContextProps {
-  provider: ethers.providers.Web3Provider | null;
+  provider: ethers.BrowserProvider | null;
   signer: ethers.Signer | null;
   address: string;
   isConnected: boolean;
   balance: string;
   connectWallet: () => Promise<void>;
   disconnectWallet: () => void;
-  getCurrentChainId: () => Promise<string>; // Add this method
+  getCurrentChainId: () => Promise<string>;
 }
 
 const Web3Context = createContext<Web3ContextProps | undefined>(undefined);
@@ -26,7 +27,7 @@ export const useWeb3 = () => {
 export const Web3Provider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
-  const [provider, setProvider] = useState<ethers.providers.Web3Provider | null>(null);
+  const [provider, setProvider] = useState<ethers.BrowserProvider | null>(null);
   const [signer, setSigner] = useState<ethers.Signer | null>(null);
   const [address, setAddress] = useState<string>("");
   const [isConnected, setIsConnected] = useState<boolean>(false);
@@ -36,23 +37,23 @@ export const Web3Provider: React.FC<{ children: React.ReactNode }> = ({
     if (window.ethereum) {
       try {
         await window.ethereum.request({ method: "eth_requestAccounts" });
-        const tempProvider = new ethers.providers.Web3Provider(window.ethereum);
+        const tempProvider = new ethers.BrowserProvider(window.ethereum);
         setProvider(tempProvider);
 
-        const tempSigner = tempProvider.getSigner();
+        const tempSigner = await tempProvider.getSigner();
         setSigner(tempSigner);
 
         const tempAddress = await tempSigner.getAddress();
         setAddress(tempAddress);
 
         const tempBalance = await tempProvider.getBalance(tempAddress);
-        setBalance(ethers.utils.formatEther(tempBalance));
+        setBalance(ethers.formatEther(tempBalance));
 
         setIsConnected(true);
 
         // Switch to eduChain network if not already connected
-        const chainId = await tempProvider.getNetwork();
-        if (chainId.chainId !== parseInt(EDU_CHAIN_CONFIG.chainId)) {
+        const network = await tempProvider.getNetwork();
+        if (network.chainId !== BigInt(parseInt(EDU_CHAIN_CONFIG.chainId, 16))) {
           try {
             await window.ethereum.request({
               method: "wallet_addEthereumChain",
@@ -85,7 +86,7 @@ export const Web3Provider: React.FC<{ children: React.ReactNode }> = ({
           setAddress(accounts[0]);
           if (provider) {
             const tempBalance = await provider.getBalance(accounts[0]);
-            setBalance(ethers.utils.formatEther(tempBalance));
+            setBalance(ethers.formatEther(tempBalance));
           }
           setIsConnected(true);
         } else {
@@ -113,7 +114,12 @@ export const Web3Provider: React.FC<{ children: React.ReactNode }> = ({
     }
   }, [isConnected, connectWallet]);
 
-  // Include the getCurrentChainId method in the provider value
+  const getCurrentChainId = async () => {
+    if (!provider) return "";
+    const network = await provider.getNetwork();
+    return '0x' + network.chainId.toString(16);
+  };
+
   const providerValue = {
     provider,
     signer,
@@ -122,11 +128,7 @@ export const Web3Provider: React.FC<{ children: React.ReactNode }> = ({
     balance,
     connectWallet,
     disconnectWallet,
-    getCurrentChainId: async () => {
-      if (!provider) return "";
-      const network = await provider.getNetwork();
-      return network.chainId.toString(16);
-    }
+    getCurrentChainId
   };
 
   return (

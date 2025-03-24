@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from "react";
 import { useWeb3 } from "@/context/Web3Provider";
 import { Button } from "@/components/ui/button";
@@ -7,6 +8,8 @@ import { toast } from "@/hooks/use-toast";
 import { Toaster } from "@/components/ui/toaster";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
+import { ethers } from "ethers";
+import { CONTRACT_ADDRESS, CONTRACT_ABI } from "@/lib/utils";
 
 const Balance = () => {
   const web3 = useWeb3();
@@ -37,7 +40,28 @@ const Balance = () => {
         return;
       }
 
-      await web3.withdraw(amount.toString());
+      if (!web3.signer || !web3.provider) {
+        toast({
+          title: "Error",
+          description: "Wallet not connected properly.",
+        });
+        return;
+      }
+
+      // Create contract instance
+      const contract = new ethers.Contract(
+        CONTRACT_ADDRESS,
+        CONTRACT_ABI,
+        web3.signer
+      );
+
+      // Convert amount to wei
+      const amountInWei = ethers.parseEther(amount.toString());
+
+      // Call withdraw function on the contract
+      const tx = await contract.withdraw(amountInWei);
+      await tx.wait();
+      
       toast({
         title: "Success",
         description: `Successfully withdrew ${amount} EDU.`,
