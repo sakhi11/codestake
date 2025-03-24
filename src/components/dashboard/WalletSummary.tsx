@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from "react";
 import { ethers } from "ethers";
 import { Coins, Trophy, Users, CheckSquare } from "lucide-react";
@@ -268,7 +269,7 @@ const ABI = [
 ];
 
 const WalletSummary = () => {
-  const { wallet, isConnected, switchToEduChain } = useWeb3();
+  const { address, isConnected, switchToEduChain } = useWeb3();
   const [summary, setSummary] = useState({
     totalStaked: 0,
     ongoingChallenges: 0,
@@ -279,14 +280,14 @@ const WalletSummary = () => {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (wallet && isConnected) {
+    if (address && isConnected) {
       fetchSummary();
     } else {
       // If wallet is not connected, show mock data
       setLoading(false);
       setError(null);
     }
-  }, [wallet, isConnected]);
+  }, [address, isConnected]);
 
   const fetchSummary = async () => {
     setLoading(true);
@@ -294,7 +295,7 @@ const WalletSummary = () => {
 
     try {
       // Check if wallet is available
-      if (!window.ethereum || !wallet) {
+      if (!window.ethereum || !address) {
         // Use mock data if wallet is not available
         setSummary({
           totalStaked: 0.5,
@@ -319,7 +320,7 @@ const WalletSummary = () => {
 
       // Initialize provider
       const provider = new ethers.BrowserProvider(window.ethereum);
-      const userAddress = wallet;
+      const userAddress = address;
 
       try {
         // Try to get user data from contract first

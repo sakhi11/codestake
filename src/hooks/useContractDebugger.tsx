@@ -1,74 +1,86 @@
-import { useCallback, useState } from "react";
-import { useWeb3 } from "@/context/Web3Provider";
-import { CONTRACT_ABI, CONTRACT_ADDRESS } from "@/lib/utils";
-import { ethers } from "ethers";
 
-export function useContractDebugger() {
-  const { provider, address, isConnected } = useWeb3();
-  const [logs, setLogs] = useState<string[]>([]);
-  const [isDebugging, setIsDebugging] = useState(false);
+import { useState, useEffect, useCallback } from 'react';
+import { ethers } from 'ethers';
+import { useWeb3 } from '@/context/Web3Provider';
+import { EDU_CHAIN_CONFIG } from '@/lib/utils';
 
-  // Return a boolean value instead of void to fix type error
-  const enableDebugging = useCallback(() => {
-    setIsDebugging(true);
-    return true;
+interface DebuggerState {
+  isDebugging: boolean;
+  logs: string[];
+}
+
+export const useContractDebugger = () => {
+  const { provider, signer, address, isConnected } = useWeb3();
+  const [debugState, setDebugState] = useState<DebuggerState>({
+    isDebugging: false,
+    logs: [],
+  });
+
+  const addLog = useCallback((message: string) => {
+    setDebugState(prev => ({
+      ...prev,
+      logs: [...prev.logs, `${new Date().toISOString()} - ${message}`]
+    }));
   }, []);
 
-  const logEvent = useCallback((message: string) => {
-    setLogs((prevLogs) => [...prevLogs, message]);
+  // Effect to check for debugging flag
+  useEffect(() => {
+    const isDebuggingEnabled = localStorage.getItem('codestake_debug_mode') === 'true';
+    setDebugState(prev => ({
+      ...prev,
+      isDebugging: isDebuggingEnabled
+    }));
   }, []);
 
-  const clearLogs = useCallback(() => {
-    setLogs([]);
-  }, []);
+  // Initialize contract with proper handling for Promise<Signer>
+  const initializeContract = useCallback(async (
+    contractAddress: string, 
+    contractAbi: ethers.InterfaceAbi
+  ) => {
+    if (!provider || !signer) {
+      addLog('Provider or signer not available');
+      return null;
+    }
 
-  const executeContractFunction = useCallback(
-    async (functionName: string, ...args: any[]) => {
-      if (!provider || !address || !isConnected) {
-        logEvent("Not connected to the wallet.");
-        return;
-      }
+    try {
+      // Create contract with signer, not the Promise
+      const contract = new ethers.Contract(contractAddress, contractAbi, signer);
+      addLog('Contract initialized successfully');
+      return contract;
+    } catch (error) {
+      addLog(`Error initializing contract: ${error}`);
+      return null;
+    }
+  }, [provider, signer, addLog]);
 
-      if (!isDebugging) {
-        logEvent("Debugging is not enabled.");
-        return;
-      }
+  // Check network compatibility
+  const checkNetwork = useCallback(async () => {
+    if (!provider) {
+      addLog('Provider not available');
+      return false;
+    }
 
-      try {
-        const signer = provider.getSigner();
-        const contract = new ethers.Contract(
-          CONTRACT_ADDRESS,
-          CONTRACT_ABI,
-          signer
-        );
-
-        logEvent(`Executing function: ${functionName} with args: ${JSON.stringify(args)}`);
-
-        const transaction = await contract[functionName](...args);
-        logEvent(`Transaction sent: ${transaction.hash}`);
-
-        const receipt = await transaction.wait();
-        logEvent(`Transaction confirmed in block: ${receipt.blockNumber}`);
-        logEvent(`Gas used: ${receipt.gasUsed.toString()}`);
-
-        if (receipt.events) {
-          receipt.events.forEach((event) => {
-            logEvent(`Event: ${event.event}, Args: ${JSON.stringify(event.args)}`);
-          });
-        }
-      } catch (error: any) {
-        logEvent(`Error executing function: ${error.message}`);
-      }
-    },
-    [provider, address, isConnected, isDebugging, logEvent]
-  );
+    try {
+      const network = await provider.getNetwork();
+      const eduChainId = BigInt(parseInt(EDU_CHAIN_CONFIG.chainId, 16));
+      const isCorrectNetwork = network.chainId === eduChainId;
+      
+      addLog(`Network check: Chain ID ${network.chainId.toString()}, eduChain ID ${eduChainId.toString()}`);
+      addLog(`On correct network: ${isCorrectNetwork ? 'Yes' : 'No'}`);
+      
+      return isCorrectNetwork;
+    } catch (error) {
+      addLog(`Network check error: ${error}`);
+      return false;
+    }
+  }, [provider, addLog]);
 
   return {
-    logs,
-    isDebugging,
-    enableDebugging,
-    logEvent,
-    clearLogs,
-    executeContractFunction,
+    ...debugState,
+    addLog,
+    initializeContract,
+    checkNetwork,
   };
-}
+};
+
+export default useContractDebugger;

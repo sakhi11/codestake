@@ -1,7 +1,8 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { ethers } from "ethers";
-import { EDU_CHAIN_CONFIG } from "@/lib/utils";
+import { toast } from "sonner";
+import { EDU_CHAIN_CONFIG, CONTRACT_ADDRESS, CONTRACT_ABI } from "@/lib/utils";
 
 interface Web3ContextProps {
   provider: ethers.BrowserProvider | null;
@@ -9,9 +10,12 @@ interface Web3ContextProps {
   address: string;
   isConnected: boolean;
   balance: string;
+  wallet: string; // add wallet property
+  contract: ethers.Contract | null;
   connectWallet: () => Promise<void>;
   disconnectWallet: () => void;
   getCurrentChainId: () => Promise<string>;
+  switchToEduChain: () => Promise<void>; // add switchToEduChain method
 }
 
 const Web3Context = createContext<Web3ContextProps | undefined>(undefined);
@@ -32,6 +36,37 @@ export const Web3Provider: React.FC<{ children: React.ReactNode }> = ({
   const [address, setAddress] = useState<string>("");
   const [isConnected, setIsConnected] = useState<boolean>(false);
   const [balance, setBalance] = useState<string>("0");
+  const [contract, setContract] = useState<ethers.Contract | null>(null);
+  
+  const switchToEduChain = useCallback(async () => {
+    if (!window.ethereum) {
+      toast.error("MetaMask is not installed!");
+      return;
+    }
+    
+    try {
+      await window.ethereum.request({
+        method: "wallet_switchEthereumChain",
+        params: [{ chainId: EDU_CHAIN_CONFIG.chainId }],
+      });
+    } catch (switchError: any) {
+      // This error code indicates that the chain has not been added to MetaMask
+      if (switchError.code === 4902) {
+        try {
+          await window.ethereum.request({
+            method: "wallet_addEthereumChain",
+            params: [EDU_CHAIN_CONFIG],
+          });
+        } catch (addError: any) {
+          toast.error("Failed to add eduChain network: " + (addError.message || "Unknown error"));
+          console.error("Failed to add eduChain:", addError);
+        }
+      } else {
+        toast.error("Failed to switch to eduChain network: " + (switchError.message || "Unknown error"));
+        console.error("Failed to switch to eduChain:", switchError);
+      }
+    }
+  }, []);
 
   const connectWallet = useCallback(async () => {
     if (window.ethereum) {
@@ -45,31 +80,35 @@ export const Web3Provider: React.FC<{ children: React.ReactNode }> = ({
 
         const tempAddress = await tempSigner.getAddress();
         setAddress(tempAddress);
-
+        
+        // Update wallet property
         const tempBalance = await tempProvider.getBalance(tempAddress);
         setBalance(ethers.formatEther(tempBalance));
+
+        // Initialize contract
+        const tempContract = new ethers.Contract(
+          CONTRACT_ADDRESS,
+          CONTRACT_ABI,
+          tempSigner
+        );
+        setContract(tempContract);
 
         setIsConnected(true);
 
         // Switch to eduChain network if not already connected
         const network = await tempProvider.getNetwork();
         if (network.chainId !== BigInt(parseInt(EDU_CHAIN_CONFIG.chainId, 16))) {
-          try {
-            await window.ethereum.request({
-              method: "wallet_addEthereumChain",
-              params: [EDU_CHAIN_CONFIG],
-            });
-          } catch (addError: any) {
-            console.error(addError);
-          }
+          await switchToEduChain();
         }
       } catch (error: any) {
         console.error("Wallet connection error:", error);
+        toast.error("Failed to connect wallet: " + (error.message || "Unknown error"));
       }
     } else {
+      toast.error("MetaMask not detected! Please install MetaMask extension.");
       console.error("MetaMask not detected");
     }
-  }, []);
+  }, [switchToEduChain]);
 
   const disconnectWallet = () => {
     setProvider(null);
@@ -77,6 +116,7 @@ export const Web3Provider: React.FC<{ children: React.ReactNode }> = ({
     setAddress("");
     setIsConnected(false);
     setBalance("0");
+    setContract(null);
   };
 
   useEffect(() => {
@@ -126,9 +166,12 @@ export const Web3Provider: React.FC<{ children: React.ReactNode }> = ({
     address,
     isConnected,
     balance,
+    wallet: address, // set wallet to address for compatibility
+    contract,
     connectWallet,
     disconnectWallet,
-    getCurrentChainId
+    getCurrentChainId,
+    switchToEduChain
   };
 
   return (
