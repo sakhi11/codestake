@@ -1,5 +1,6 @@
+
 import React, { useEffect, useRef } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Coins, Award, Shield, TrendingUp } from "lucide-react";
 
 const features = [
@@ -86,15 +87,15 @@ const Features = () => {
               className="animate-on-scroll"
               style={{ transitionDelay: `${index * 100}ms` }}
             >
-              <Card variant="glass" className="h-full">
+              <Card className="h-full">
                 <CardHeader className="pb-2">
                   {feature.icon}
                   <CardTitle>{feature.title}</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <CardDescription className="text-white/70">
+                  <p className="text-white/70">
                     {feature.description}
-                  </CardDescription>
+                  </p>
                 </CardContent>
               </Card>
             </div>

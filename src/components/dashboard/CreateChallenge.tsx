@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { ethers } from "ethers";
 import { toast } from "sonner";
@@ -8,7 +9,7 @@ import {
   CardFooter, 
   CardHeader, 
   CardTitle 
-} from "@/components/ui/Card"; 
+} from "@/components/ui/card"; 
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button"; 
@@ -33,7 +34,7 @@ const CreateChallenge: React.FC<CreateChallengeProps> = ({ onCreateChallenge, wa
   const [stakeAmount, setStakeAmount] = useState("");
   const [track, setTrack] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const { wallet } = useWeb3();
+  const { address } = useWeb3();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -114,7 +115,7 @@ const CreateChallenge: React.FC<CreateChallengeProps> = ({ onCreateChallenge, wa
               onChange={(e) => setStakeAmount(e.target.value)}
               className="bg-white/5 border-white/10 text-white"
             />
-            {wallet && (
+            {address && (
               <p className="text-white/60 text-sm mt-1">
                 Wallet Balance: {walletBalance} ETH
               </p>

@@ -98,16 +98,18 @@ const CreateChallengeHelper: React.FC<Props> = ({
 };
 
 export const DebugInfo = () => {
-  const { isDebugMode, networkStatus } = useContractDebugger();
+  const { isDebugging, logs } = useContractDebugger();
   
-  if (!isDebugMode) return null;
+  if (!isDebugging) return null;
   
   return (
     <div className="mt-4 p-3 border border-orange-400 bg-orange-100/10 rounded-md">
       <h3 className="font-medium text-orange-500">Debug Information</h3>
-      <p className="text-sm text-orange-400">Network: {networkStatus.networkName}</p>
-      <p className="text-sm text-orange-400">Chain ID: {networkStatus.chainId || 'Unknown'}</p>
-      <p className="text-sm text-orange-400">Network Status: {networkStatus.isCorrectNetwork ? 'Connected to eduChain' : 'Not on eduChain'}</p>
+      {logs.length > 0 && (
+        <div className="text-sm text-orange-400">
+          <p>Last log: {logs[logs.length - 1]}</p>
+        </div>
+      )}
     </div>
   );
 };
