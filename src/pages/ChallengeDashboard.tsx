@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import DashboardNavbar from "@/components/layout/DashboardNavbar";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -71,7 +72,7 @@ const Milestone = ({ milestone }: { milestone: MilestoneItem }) => {
 const ChallengeDashboard = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
-  const { wallet, contract, isConnected, switchToEduChain } = useWeb3();
+  const { wallet, contract, isConnected, switchToEduChain, networkDetails } = useWeb3();
   const [milestones, setMilestones] = useState<MilestoneItem[]>([
     {
       id: 1,
@@ -102,25 +103,14 @@ const ChallengeDashboard = () => {
     },
   ]);
   const [isQuizModalOpen, setIsQuizModalOpen] = useState(false);
-  const [selectedMilestone, setSelectedMilestone] = useState<any>(null);
-  const [isOnCorrectNetwork, setIsOnCorrectNetwork] = useState(true);
+  const [selectedMilestone, setSelectedMilestone] = useState<MilestoneItem | null>(null);
   const [contractValid, setContractValid] = useState(true);
 
   useEffect(() => {
     console.log("ChallengeDashboard - Address:", wallet);
     console.log("ChallengeDashboard - Contract:", contract);
     console.log("ChallengeDashboard - IsConnected:", isConnected);
-    
-    const checkNetwork = async () => {
-      if (window.ethereum) {
-        const chainId = await window.ethereum.request({ method: 'eth_chainId' });
-        setIsOnCorrectNetwork(chainId === EDU_CHAIN_CONFIG.chainId);
-        
-        if (chainId !== EDU_CHAIN_CONFIG.chainId) {
-          toast.warning(`Please switch to eduChain Testnet (Chain ID: ${EDU_CHAIN_CONFIG.chainId})`);
-        }
-      }
-    };
+    console.log("ChallengeDashboard - Network Details:", networkDetails);
     
     const validateContract = () => {
       if (contract) {
@@ -133,29 +123,37 @@ const ChallengeDashboard = () => {
       }
     };
     
-    checkNetwork();
     validateContract();
-  }, [wallet, contract, isConnected]);
+  }, [wallet, contract, isConnected, networkDetails]);
 
   const handleNetworkCheck = async () => {
     if (!window.ethereum) return false;
     
     try {
-      const chainId = await window.ethereum.request({ method: 'eth_chainId' });
-      if (chainId !== EDU_CHAIN_CONFIG.chainId) {
-        toast.warning("You're not connected to eduChain. Please switch networks.", {
-          action: {
-            label: 'Switch Network',
-            onClick: async () => {
-              try {
-                await switchToEduChain();
-                await fetchChallenge();
-              } catch (error) {
-                console.error("Failed to switch network:", error);
-                toast.error("Failed to switch network. Please try manually in your wallet.");
-              }
-            }
-          }
+      if (!networkDetails.isCorrectNetwork) {
+        toast({
+          title: "Network Mismatch",
+          description: (
+            <div>
+              <p>You're not connected to eduChain Testnet. Current network: {networkDetails.name} ({networkDetails.chainId})</p>
+              <div className="mt-2 p-2 bg-gray-100 dark:bg-gray-800 rounded text-sm">
+                <p className="font-semibold">Required Network Details:</p>
+                <ul className="list-disc pl-4 mt-1">
+                  <li>Name: {EDU_CHAIN_CONFIG.chainName}</li>
+                  <li>Chain ID: {EDU_CHAIN_CONFIG.chainId}</li>
+                  <li>RPC URL: {EDU_CHAIN_CONFIG.rpcUrls[0]}</li>
+                  <li>Symbol: {EDU_CHAIN_CONFIG.nativeCurrency.symbol}</li>
+                </ul>
+              </div>
+              <Button 
+                onClick={async () => await switchToEduChain()} 
+                className="w-full mt-3"
+              >
+                Switch Network
+              </Button>
+            </div>
+          ),
+          duration: 8000,
         });
         return false;
       }
@@ -197,17 +195,26 @@ const ChallengeDashboard = () => {
   };
 
   const fetchChallenge = async () => {
-    if (id) {
-      const challenge = await contract.getChallenge(id);
-      setMilestones([challenge]);
+    if (id && contract && contract.getChallenge) {
+      try {
+        const challenge = await contract.getChallenge(id);
+        if (challenge) {
+          // Process challenge data
+          console.log("Fetched challenge:", challenge);
+        }
+      } catch (error) {
+        console.error("Error fetching challenge:", error);
+      }
     }
   };
 
   useEffect(() => {
-    fetchChallenge();
-  }, [id]);
+    if (contract && id) {
+      fetchChallenge();
+    }
+  }, [id, contract]);
 
-  const handleOpenQuizModal = (milestone: any) => {
+  const handleOpenQuizModal = (milestone: MilestoneItem) => {
     setSelectedMilestone(milestone);
     setIsQuizModalOpen(true);
   };
@@ -217,21 +224,6 @@ const ChallengeDashboard = () => {
     const result = await completeMilestone(code);
     if (result) {
       setIsQuizModalOpen(false);
-    }
-  };
-
-  const handleSwitchNetwork = async () => {
-    try {
-      const switched = await switchToEduChain();
-      if (switched) {
-        setIsOnCorrectNetwork(true);
-        toast.success("Successfully switched to eduChain Testnet!");
-      } else {
-        toast.error("Failed to switch networks. Please try manually in your wallet.");
-      }
-    } catch (error) {
-      console.error("Error switching network:", error);
-      toast.error("Failed to switch networks");
     }
   };
 
@@ -249,13 +241,22 @@ const ChallengeDashboard = () => {
             <CardContent>
               <p className="text-white/70">Track your progress and complete milestones.</p>
               
-              {!isOnCorrectNetwork && (
+              {!networkDetails.isCorrectNetwork && (
                 <div className="mt-4 p-3 bg-red-500/20 border border-red-500 rounded-md">
                   <p className="text-red-200 text-sm">
                     You are not connected to eduChain Testnet. Some features may not work correctly.
                   </p>
+                  <div className="mt-2 p-2 bg-gray-700/50 rounded text-xs">
+                    <p className="font-semibold text-white">Network Details:</p>
+                    <ul className="list-disc pl-4 mt-1 text-gray-200">
+                      <li>Network Name: {EDU_CHAIN_CONFIG.chainName}</li>
+                      <li>Chain ID: {EDU_CHAIN_CONFIG.chainId}</li>
+                      <li>RPC URL: {EDU_CHAIN_CONFIG.rpcUrls[0]}</li>
+                      <li>Symbol: {EDU_CHAIN_CONFIG.nativeCurrency.symbol}</li>
+                    </ul>
+                  </div>
                   <Button 
-                    onClick={handleSwitchNetwork}
+                    onClick={async () => await switchToEduChain()}
                     className="mt-2 bg-red-500 hover:bg-red-600 text-white text-sm"
                     size="sm"
                   >
@@ -264,7 +265,7 @@ const ChallengeDashboard = () => {
                 </div>
               )}
 
-              {!contractValid && isOnCorrectNetwork && (
+              {!contractValid && networkDetails.isCorrectNetwork && (
                 <div className="mt-4 p-3 bg-yellow-500/20 border border-yellow-500 rounded-md">
                   <p className="text-yellow-200 text-sm">
                     Contract interface appears to be incomplete. This could be due to a connection issue.
@@ -289,7 +290,9 @@ const ChallengeDashboard = () => {
           </h2>
           <div className="space-y-4">
             {milestones.map((milestone) => (
-              <Milestone key={milestone.id} milestone={milestone} />
+              <div key={milestone.id} onClick={() => handleOpenQuizModal(milestone)}>
+                <Milestone milestone={milestone} />
+              </div>
             ))}
           </div>
         </section>

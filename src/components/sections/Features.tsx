@@ -1,6 +1,6 @@
+
 import React from "react";
-// Fix import casing to match actual file
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
 interface FeatureItem {
@@ -47,9 +47,9 @@ const Features = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <CardDescription className="text-white/70">
+                <p className="text-white/70">
                   {feature.description}
-                </CardDescription>
+                </p>
               </CardContent>
             </Card>
           ))}
