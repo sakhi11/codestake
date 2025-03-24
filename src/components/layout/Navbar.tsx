@@ -1,5 +1,6 @@
 
 import React, { useEffect, useState } from "react";
+// Fix import casing to match actual file
 import { Button } from "@/components/ui/button";
 import { Wallet, Menu, X } from "lucide-react";
 import { cn } from "@/lib/utils";

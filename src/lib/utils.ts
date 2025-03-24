@@ -25,15 +25,15 @@ export function cn(...inputs: ClassValue[]) {
 
 // eduChain network configuration for MetaMask
 export const EDU_CHAIN_CONFIG = {
-  chainId: "0x7A69",
-  chainName: "eduChain Testnet",
+  chainId: "0xa045c",
+  chainName: "EDU Chain Testnet",
   nativeCurrency: {
-    name: "eduChain Token",
+    name: "EDU Token",
     symbol: "EDU",
     decimals: 18,
   },
-  rpcUrls: ["http://localhost:8545"],
-  blockExplorerUrls: ["http://localhost:8545"],
+  rpcUrls: ["wss://open-campus-codex-sepolia.drpc.org"],
+  blockExplorerUrls: ["https://sepolia.etherscan.io"], // Assuming Sepolia explorer, update if there's a specific one
 };
 
 // Utility function to format wallet address for display

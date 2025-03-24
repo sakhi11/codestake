@@ -166,6 +166,36 @@ const ChallengeDashboard = () => {
     }
   };
 
+  const completeMilestone = async (code: string) => {
+    if (!contract || !isConnected || !id) {
+      toast.error("Wallet not connected or contract not available");
+      return false;
+    }
+
+    try {
+      const isCorrectNetwork = await handleNetworkCheck();
+      if (!isCorrectNetwork) {
+        return false;
+      }
+
+      toast.success(`Quiz completed successfully! Code: ${code}`);
+      
+      setMilestones(prevMilestones => 
+        prevMilestones.map(m => 
+          m.id === selectedMilestone?.id 
+            ? {...m, status: 'complete', isCompleted: true} 
+            : m
+        )
+      );
+      
+      return true;
+    } catch (error: any) {
+      console.error("Error completing milestone:", error);
+      toast.error(error.message || "Failed to complete milestone");
+      return false;
+    }
+  };
+
   const fetchChallenge = async () => {
     if (id) {
       const challenge = await contract.getChallenge(id);

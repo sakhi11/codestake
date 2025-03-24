@@ -270,9 +270,7 @@ const Dashboard = () => {
       <main className="container mx-auto px-4 py-8 mt-16">
         <WalletSummary />
         <CreateChallenge onCreateChallenge={handleCreateChallenge} walletBalance={walletBalance} />
-        <OngoingChallenges 
-          challenges={ongoingChallenges}
-        />
+        <OngoingChallenges />
       </main>
       <Footer />
     </div>

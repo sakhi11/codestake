@@ -77,7 +77,11 @@ const OngoingChallenges = () => {
         const challenge = challenges[challengeId];
         if (!challenge) return null;
 
-        const stakeProgress = (parseFloat(challenge.stakedAmount) / parseFloat(challenge.totalStake)) * 100;
+        // Convert to numbers before division to fix TypeScript error
+        const stakeProgress = (
+          (parseFloat(challenge.stakedAmount.toString()) / 
+          parseFloat(challenge.totalStake.toString())) * 100
+        );
 
         return (
           <Card key={challengeId} className="border border-white/10 bg-web3-card hover:scale-[1.02] transition-transform duration-300 hover:shadow-[0_0_15px_rgba(74,144,226,0.15)]">
