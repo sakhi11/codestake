@@ -42,6 +42,12 @@ export function formatAddress(address: string): string {
   return `${address.slice(0, 6)}...${address.slice(-4)}`;
 }
 
+// Add the missing shortenAddress function (same as formatAddress for compatibility)
+export function shortenAddress(address: string): string {
+  if (!address) return "";
+  return `${address.slice(0, 6)}...${address.slice(-4)}`;
+}
+
 // Utility function to format ETH value with specified decimal places
 export function formatEth(value: string | number, decimals: number = 4): string {
   if (typeof value === "string") {

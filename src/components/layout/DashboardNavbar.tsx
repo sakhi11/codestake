@@ -1,10 +1,8 @@
-
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Button } from "../ui/button";
+import { Button } from "@/components/ui/button";
 import { Menu, X, Wallet, ChevronDown, LogOut } from "lucide-react";
-import { shortenAddress } from "@/lib/utils";
-import { cn } from "@/lib/utils";
+import { cn, shortenAddress } from "@/lib/utils";
 import { useWeb3 } from "@/context/Web3Provider";
 
 export interface DashboardNavbarProps {
