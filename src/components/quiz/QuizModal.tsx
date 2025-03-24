@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/ui/Button";
 import CodeEditor from './CodeEditor';
 import { X } from 'lucide-react';
 
@@ -46,7 +46,7 @@ const QuizModal: React.FC<QuizModalProps> = ({ isOpen, onClose, milestone, onSub
             <CodeEditor 
               value={code} 
               onChange={setCode} 
-              height="300px" 
+              // Remove the height prop as it doesn't exist in the CodeEditor interface
             />
           </div>
           <div className="flex justify-end space-x-2 mt-4">

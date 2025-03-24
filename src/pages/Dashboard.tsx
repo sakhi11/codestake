@@ -83,15 +83,9 @@ const Dashboard = () => {
     }
 
     try {
-      const walletSummary = await contract.getWalletSummary?.(wallet).catch(() => null);
-      
-      if (walletSummary) {
-        setWalletBalance(ethers.formatEther(walletSummary.balance || 0n));
-      } else {
-        const provider = new ethers.BrowserProvider(window.ethereum);
-        const balance = await provider.getBalance(wallet);
-        setWalletBalance(ethers.formatEther(balance));
-      }
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      const balance = await provider.getBalance(wallet);
+      setWalletBalance(ethers.formatEther(balance));
     } catch (error) {
       console.error("Error fetching wallet balance:", error);
       try {
@@ -220,7 +214,7 @@ const Dashboard = () => {
       
       toast.loading("Creating challenge...");
 
-      // Calculate 30 days from now for milestone timestamps (for simplicity, all at once)
+      // Calculate 30 days from now for milestone timestamps
       const thirtyDaysFromNow = Math.floor(Date.now() / 1000) + (30 * 24 * 60 * 60);
       const milestoneTimestamps = [
         thirtyDaysFromNow,
