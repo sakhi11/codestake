@@ -54,6 +54,10 @@ export const Web3Provider: React.FC<{ children: React.ReactNode }> = ({
       const chainIdHex = '0x' + network.chainId.toString(16);
       const isCorrectNetwork = chainIdHex === EDU_CHAIN_CONFIG.chainId;
       
+      console.log("Current network:", network.name, "Chain ID:", chainIdHex);
+      console.log("Expected eduChain ID:", EDU_CHAIN_CONFIG.chainId);
+      console.log("Is on correct network:", isCorrectNetwork);
+      
       setNetworkDetails({
         chainId: chainIdHex,
         name: network.name || "Unknown Network",
@@ -137,56 +141,7 @@ export const Web3Provider: React.FC<{ children: React.ReactNode }> = ({
   }, [provider, checkNetwork]);
 
   const connectWallet = useCallback(async () => {
-    if (window.ethereum) {
-      try {
-        await window.ethereum.request({ method: "eth_requestAccounts" });
-        const tempProvider = new ethers.BrowserProvider(window.ethereum);
-        setProvider(tempProvider);
-
-        const tempSigner = await tempProvider.getSigner();
-        setSigner(tempSigner);
-
-        const tempAddress = await tempSigner.getAddress();
-        setAddress(tempAddress);
-        
-        // Update wallet property
-        const tempBalance = await tempProvider.getBalance(tempAddress);
-        setBalance(ethers.formatEther(tempBalance));
-
-        // Initialize contract
-        const tempContract = new ethers.Contract(
-          CONTRACT_ADDRESS,
-          CONTRACT_ABI,
-          tempSigner
-        );
-        setContract(tempContract);
-
-        setIsConnected(true);
-
-        // Check network and show appropriate messages
-        const isCorrectNetwork = await checkNetwork(tempProvider);
-        if (!isCorrectNetwork) {
-          toast({
-            title: "Wrong Network Detected",
-            description: (
-              <div>
-                <p>Please switch to {EDU_CHAIN_CONFIG.chainName} (Chain ID: {EDU_CHAIN_CONFIG.chainId}).</p>
-                <button 
-                  onClick={switchToEduChain}
-                  className="mt-2 px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 w-full"
-                >
-                  Switch Network
-                </button>
-              </div>
-            ),
-            duration: 5000,
-          });
-        }
-      } catch (error: any) {
-        console.error("Wallet connection error:", error);
-        toast.error("Failed to connect wallet: " + (error.message || "Unknown error"));
-      }
-    } else {
+    if (!window.ethereum) {
       toast({
         title: "MetaMask Not Detected",
         description: (
@@ -205,6 +160,67 @@ export const Web3Provider: React.FC<{ children: React.ReactNode }> = ({
         duration: 8000,
       });
       console.error("MetaMask not detected");
+      return;
+    }
+
+    try {
+      // Request account access
+      await window.ethereum.request({ method: "eth_requestAccounts" });
+      const tempProvider = new ethers.BrowserProvider(window.ethereum);
+      setProvider(tempProvider);
+
+      const tempSigner = await tempProvider.getSigner();
+      setSigner(tempSigner);
+
+      const tempAddress = await tempSigner.getAddress();
+      setAddress(tempAddress);
+      
+      // Update wallet property
+      const tempBalance = await tempProvider.getBalance(tempAddress);
+      setBalance(ethers.formatEther(tempBalance));
+
+      console.log("Connected to wallet:", tempAddress);
+      console.log("Balance:", ethers.formatEther(tempBalance));
+
+      try {
+        // Initialize contract
+        console.log("Initializing contract at:", CONTRACT_ADDRESS);
+        const tempContract = new ethers.Contract(
+          CONTRACT_ADDRESS,
+          CONTRACT_ABI,
+          tempSigner
+        );
+        setContract(tempContract);
+        console.log("Contract initialized successfully");
+      } catch (contractError) {
+        console.error("Error initializing contract:", contractError);
+        toast.error("Failed to initialize contract. Please try again.");
+      }
+
+      setIsConnected(true);
+
+      // Check network and show appropriate messages
+      const isCorrectNetwork = await checkNetwork(tempProvider);
+      if (!isCorrectNetwork) {
+        toast({
+          title: "Wrong Network Detected",
+          description: (
+            <div>
+              <p>Please switch to {EDU_CHAIN_CONFIG.chainName} (Chain ID: {EDU_CHAIN_CONFIG.chainId}).</p>
+              <button 
+                onClick={switchToEduChain}
+                className="mt-2 px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 w-full"
+              >
+                Switch Network
+              </button>
+            </div>
+          ),
+          duration: 5000,
+        });
+      }
+    } catch (error: any) {
+      console.error("Wallet connection error:", error);
+      toast.error("Failed to connect wallet: " + (error.message || "Unknown error"));
     }
   }, [checkNetwork, switchToEduChain]);
 
