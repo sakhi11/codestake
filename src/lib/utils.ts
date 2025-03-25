@@ -3,19 +3,24 @@ import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { ethers } from "ethers";
 
-// Smart Contract Details - update ABI to match actual contract
+// Smart Contract Details - update ABI to use concrete types instead of complex structs
 const CONTRACT_ADDRESS = "0x5b4050c163Fb24522Fa25876b8F6A983a69D9165";
 const CONTRACT_ABI = [
-  "function getChallengeDetails(uint256 challengeId) view returns (Challenge memory)",
-  "function createChallenge(uint256 stakeAmount, uint256 totalPlayers, address[] participants, uint256[] milestoneTimestamps) payable",
+  // Use concrete types instead of Challenge memory
+  "function getChallengeDetails(uint256 challengeId) view returns (address creator, uint256 totalStake, uint256 totalPlayers, uint256 joinedCount, uint256 balance, uint256 milestoneCount)",
+  "function createChallenge(uint256 totalStake, uint256 totalPlayers, address[] participants, uint256[] milestoneTimestamps) payable",
   "function joinChallenge(uint256 challengeId) payable",
   "function completeMilestone(uint256 challengeId, uint256 milestoneIndex)",
   "function getWalletSummary(address user) view returns (uint256 balance, uint256 totalEarned, uint256 totalStaked)",
   "function challengeCounter() view returns (uint256)",
-  "function challenges(uint256) view returns (string name, string track, address creator, uint256 startDate, uint256 endDate, uint256 stakedAmount, uint256 totalStake, bool isActive)",
+  // Define concrete return types for challenges mapping
+  "function challenges(uint256) view returns (address creator, uint256 totalStake, uint256 totalPlayers, uint256 joinedCount, uint256 balance, uint256 rewardPerMilestone)",
   "function deposit() payable",
   "function withdraw(uint256 amount)",
   "function getActiveChallenges() view returns (uint256[])",
+  "function setMilestoneWinner(uint256 challengeId, uint256 milestoneIndex, address winner)",
+  "function withdrawRemainingBalance(uint256 challengeId)",
+  "function hasJoined(uint256, address) view returns (bool)"
 ];
 
 // Utility function to combine Tailwind CSS classes

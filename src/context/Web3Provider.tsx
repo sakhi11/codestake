@@ -115,22 +115,12 @@ export const Web3Provider: React.FC<{ children: React.ReactNode }> = ({
         } catch (addError: any) {
           console.error("Failed to add eduChain:", addError);
           
-          toast({
-            title: "Failed to add eduChain network",
-            description: (
-              <div className="mt-2">
-                <p className="mb-2">{addError.message || "Please add it manually with these details:"}</p>
-                <ul className="text-sm bg-gray-100 dark:bg-gray-800 p-3 rounded">
-                  <li><strong>Network Name:</strong> {EDU_CHAIN_CONFIG.chainName}</li>
-                  <li><strong>Chain ID:</strong> {EDU_CHAIN_CONFIG.chainId}</li>
-                  <li><strong>RPC URL:</strong> {EDU_CHAIN_CONFIG.rpcUrls[0]}</li>
-                  <li><strong>Symbol:</strong> {EDU_CHAIN_CONFIG.nativeCurrency.symbol}</li>
-                  <li><strong>Decimals:</strong> {EDU_CHAIN_CONFIG.nativeCurrency.decimals}</li>
-                </ul>
-              </div>
-            ),
-            duration: 8000,
-          });
+          toast.error("Failed to add eduChain network. Please add it manually with these details: " +
+            `Network Name: ${EDU_CHAIN_CONFIG.chainName}, ` +
+            `Chain ID: ${EDU_CHAIN_CONFIG.chainId}, ` +
+            `RPC URL: ${EDU_CHAIN_CONFIG.rpcUrls[0]}, ` +
+            `Symbol: ${EDU_CHAIN_CONFIG.nativeCurrency.symbol}`
+          );
           return false;
         }
       } else {
@@ -142,23 +132,7 @@ export const Web3Provider: React.FC<{ children: React.ReactNode }> = ({
 
   const connectWallet = useCallback(async () => {
     if (!window.ethereum) {
-      toast({
-        title: "MetaMask Not Detected",
-        description: (
-          <div>
-            <p>Please install MetaMask to use this application.</p>
-            <a 
-              href="https://metamask.io/download.html" 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="mt-2 px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 block text-center"
-            >
-              Download MetaMask
-            </a>
-          </div>
-        ),
-        duration: 8000,
-      });
+      toast.error("MetaMask Not Detected. Please install MetaMask to use this application.");
       console.error("MetaMask not detected");
       return;
     }
@@ -202,21 +176,7 @@ export const Web3Provider: React.FC<{ children: React.ReactNode }> = ({
       // Check network and show appropriate messages
       const isCorrectNetwork = await checkNetwork(tempProvider);
       if (!isCorrectNetwork) {
-        toast({
-          title: "Wrong Network Detected",
-          description: (
-            <div>
-              <p>Please switch to {EDU_CHAIN_CONFIG.chainName} (Chain ID: {EDU_CHAIN_CONFIG.chainId}).</p>
-              <button 
-                onClick={switchToEduChain}
-                className="mt-2 px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 w-full"
-              >
-                Switch Network
-              </button>
-            </div>
-          ),
-          duration: 5000,
-        });
+        toast.error(`Wrong Network Detected. Please switch to ${EDU_CHAIN_CONFIG.chainName} (Chain ID: ${EDU_CHAIN_CONFIG.chainId}).`);
       }
     } catch (error: any) {
       console.error("Wallet connection error:", error);

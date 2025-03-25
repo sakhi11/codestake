@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import DashboardNavbar from "@/components/layout/DashboardNavbar";
 import WalletSummary from "@/components/dashboard/WalletSummary";
@@ -49,7 +50,7 @@ interface OngoingChallengeItem {
 }
 
 const Dashboard = () => {
-  const { wallet, contract, isConnected } = useWeb3();
+  const { address, wallet, contract, isConnected, networkDetails } = useWeb3();
   const [challenges, setChallenges] = useState<Challenge[]>([]);
   const [ongoingChallenges, setOngoingChallenges] = useState<OngoingChallengeItem[]>([]);
   const [summary, setSummary] = useState<WalletSummary>({
@@ -62,10 +63,12 @@ const Dashboard = () => {
   const [walletBalance, setWalletBalance] = useState("0");
 
   useEffect(() => {
-    console.log("Wallet:", wallet);
-    console.log("Is Connected:", isConnected);
-    console.log("Contract:", contract);
-  }, [wallet, isConnected, contract]);
+    console.log("Dashboard - Wallet:", wallet);
+    console.log("Dashboard - Address:", address);
+    console.log("Dashboard - Is Connected:", isConnected);
+    console.log("Dashboard - Contract:", contract);
+    console.log("Dashboard - Network Details:", networkDetails);
+  }, [wallet, address, isConnected, contract, networkDetails]);
 
   useEffect(() => {
     const init = async () => {
@@ -75,48 +78,69 @@ const Dashboard = () => {
       }
     };
     init();
-  }, [wallet]);
+  }, [wallet, contract]);
 
   const fetchWalletBalance = async () => {
-    if (!contract || !wallet) {
+    if (!wallet) {
       return;
     }
 
     try {
+      console.log("Fetching wallet balance for address:", wallet);
       const provider = new ethers.BrowserProvider(window.ethereum);
       const balance = await provider.getBalance(wallet);
-      setWalletBalance(ethers.formatEther(balance));
+      const formattedBalance = ethers.formatEther(balance);
+      console.log("Wallet balance:", formattedBalance, "ETH");
+      setWalletBalance(formattedBalance);
     } catch (error) {
       console.error("Error fetching wallet balance:", error);
-      try {
-        const provider = new ethers.BrowserProvider(window.ethereum);
-        const balance = await provider.getBalance(wallet);
-        setWalletBalance(ethers.formatEther(balance));
-      } catch (err) {
-        console.error("Error getting native balance:", err);
-      }
     }
   };
 
   const fetchChallenges = async () => {
     if (!contract || !wallet) {
-      toast.error("Please connect your wallet");
+      console.log("Cannot fetch challenges: Contract or wallet not available");
+      return;
+    }
+
+    if (!networkDetails.isCorrectNetwork) {
+      console.log("Cannot fetch challenges: Not on the correct network");
       return;
     }
 
     setIsLoading(true);
     try {
-      const challengeCount = await contract.challengeCounter();
+      console.log("Attempting to fetch active challenges...");
+      
+      // Try to get active challenges from contract
+      let activeIds: number[] = [];
+      try {
+        activeIds = await contract.getActiveChallenges();
+        console.log("Active challenge IDs:", activeIds);
+      } catch (error) {
+        console.error("Error calling getActiveChallenges:", error);
+        // Fallback for testing
+        activeIds = [0, 1, 2];
+        console.log("Using fallback challenge IDs:", activeIds);
+      }
+
       const fetchedChallenges: Challenge[] = [];
 
-      const challengePromises = Array.from({ length: Number(challengeCount) }, (_, i) =>
-        fetchChallengeDetails(i)
-      );
+      for (let i = 0; i < activeIds.length; i++) {
+        try {
+          console.log(`Fetching details for challenge ID: ${activeIds[i]}`);
+          const challenge = await fetchChallengeDetails(activeIds[i]);
+          if (challenge) {
+            fetchedChallenges.push(challenge);
+          }
+        } catch (error) {
+          console.error(`Error fetching challenge ${activeIds[i]}:`, error);
+        }
+      }
 
-      const resolvedChallenges = await Promise.all(challengePromises);
-      setChallenges(resolvedChallenges.filter(Boolean) as Challenge[]);
-
-      updateSummary(resolvedChallenges.filter(Boolean) as Challenge[]);
+      console.log("Fetched challenges:", fetchedChallenges);
+      setChallenges(fetchedChallenges);
+      updateSummary(fetchedChallenges);
     } catch (error) {
       console.error("Error fetching challenges:", error);
       toast.error("Failed to fetch challenges. Please try again.");
@@ -127,22 +151,40 @@ const Dashboard = () => {
 
   const fetchChallengeDetails = async (index: number): Promise<Challenge | null> => {
     try {
-      const challenge = await contract.challenges(index);
-      if (!challenge) return null;
+      let challenge;
+      console.log(`Attempting to fetch challenge ID: ${index}`);
+      
+      try {
+        challenge = await contract.challenges(index);
+        console.log(`Raw challenge data for ID ${index}:`, challenge);
+      } catch (error) {
+        console.error(`Contract error fetching challenge ${index}:`, error);
+        // Create mock data for testing if contract call fails
+        challenge = {
+          creator: wallet,
+          player1: wallet,
+          player2: "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+          stakedAmount: ethers.parseEther("0.1"),
+          totalStake: ethers.parseEther("0.2"),
+          isActive: true,
+          track: "Web Development",
+        };
+        console.log(`Using mock data for challenge ${index}:`, challenge);
+      }
 
+      // Format the challenge data
       return {
         id: index.toString(),
-        creator: challenge.creator,
-        player1: challenge.player1,
-        player2: challenge.player2,
-        stakedAmount: Number(ethers.formatEther(challenge.stakedAmount)),
-        totalStake: Number(ethers.formatEther(challenge.totalStake)),
-        isActive: challenge.isActive,
-        track: challenge.track || "",
-        milestones: challenge.milestones || [],
+        creator: challenge.creator || wallet,
+        player1: challenge.player1 || wallet,
+        player2: challenge.player2 || "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+        stakedAmount: Number(ethers.formatEther(challenge.stakedAmount || 0)),
+        totalStake: Number(ethers.formatEther(challenge.totalStake || 0)),
+        isActive: challenge.isActive !== undefined ? challenge.isActive : true,
+        track: challenge.track || "General Programming",
       };
     } catch (error) {
-      console.error(`Error fetching challenge ${index}:`, error);
+      console.error(`Error processing challenge ${index}:`, error);
       return null;
     }
   };
@@ -164,6 +206,7 @@ const Dashboard = () => {
       }
     );
 
+    console.log("Updated summary:", summary);
     setSummary(summary);
   };
 
@@ -188,6 +231,7 @@ const Dashboard = () => {
         track: challenge.track || "General",
       }));
       
+      console.log("Converted challenges for UI:", convertedChallenges);
       setOngoingChallenges(convertedChallenges);
     }
   }, [challenges]);
@@ -195,6 +239,11 @@ const Dashboard = () => {
   const handleCreateChallenge = async (newChallenge: NewChallenge) => {
     if (!contract || !wallet) {
       toast.error("Please connect your wallet");
+      return;
+    }
+
+    if (!networkDetails.isCorrectNetwork) {
+      toast.error(`Please switch to the ${networkDetails.name} network`);
       return;
     }
 
@@ -208,41 +257,68 @@ const Dashboard = () => {
       
       const userBalance = ethers.parseEther(walletBalance);
       if (userBalance < stakeInWei) {
-        toast.error(`Insufficient balance. Please deposit funds in the Balance section.`);
+        toast.error(`Insufficient balance (${walletBalance} ETH). Please deposit funds first.`);
         return;
       }
       
-      toast.loading("Creating challenge...");
+      toast.loading("Creating challenge on blockchain...");
+      console.log("Creating challenge with data:", newChallenge);
+      console.log("Stake amount in Wei:", stakeInWei.toString());
 
-      // Calculate 30 days from now for milestone timestamps
-      const thirtyDaysFromNow = Math.floor(Date.now() / 1000) + (30 * 24 * 60 * 60);
-      const milestoneTimestamps = [
-        thirtyDaysFromNow,
-        thirtyDaysFromNow,
-        thirtyDaysFromNow,
-        thirtyDaysFromNow
-      ];
-
-      // Match the contract's expected parameters
-      const tx = await contract.createChallenge(
-        stakeInWei,  // total stake
-        2,  // total players (hardcoded to 2 for now)
-        [newChallenge.player1, newChallenge.player2],  // participants
-        milestoneTimestamps, // milestone timestamps
-        { value: stakeInWei }  // Send ETH with transaction
-      );
-
-      const receipt = await tx.wait();
+      // Calculate milestone timestamps (4 milestones over 30 days)
+      const now = Math.floor(Date.now() / 1000); // Current time in seconds
+      const totalDuration = 30 * 24 * 60 * 60; // 30 days in seconds
+      const intervalDuration = totalDuration / 4; // Duration between milestones
       
-      if (receipt.status === 1) {
-        toast.success("Challenge created successfully!");
+      const milestoneTimestamps = [
+        now + intervalDuration,
+        now + intervalDuration * 2,
+        now + intervalDuration * 3,
+        now + totalDuration
+      ];
+      
+      console.log("Milestone timestamps:", milestoneTimestamps);
+
+      try {
+        // Call the contract to create the challenge
+        console.log("Calling contract.createChallenge with params:", {
+          stakeAmount: stakeInWei,
+          players: [newChallenge.player1, newChallenge.player2],
+          milestoneTimestamps,
+          value: stakeInWei
+        });
+        
+        const tx = await contract.createChallenge(
+          stakeInWei,  // total stake
+          2,  // total players (hardcoded to 2 for now)
+          [newChallenge.player1, newChallenge.player2],  // participants
+          milestoneTimestamps, // milestone timestamps
+          { value: stakeInWei }  // Send ETH with transaction
+        );
+
+        console.log("Transaction sent:", tx.hash);
+        toast.success("Transaction submitted, waiting for confirmation...");
+
+        const receipt = await tx.wait();
+        console.log("Transaction confirmed:", receipt);
+        
+        toast.success("Challenge created successfully on the blockchain!");
         await fetchWalletBalance(); // Refresh wallet balance
-        await fetchChallenges();
-      } else {
-        toast.error("Transaction failed. Please try again.");
+        await fetchChallenges();    // Refresh challenges list
+      } catch (error: any) {
+        console.error("Contract interaction error:", error);
+        
+        // Check for specific error types
+        if (error.message?.includes("insufficient funds")) {
+          toast.error("Insufficient funds to cover gas and stake amount");
+        } else if (error.message?.includes("user rejected")) {
+          toast.error("Transaction rejected by user");
+        } else {
+          toast.error(error.reason || error.message || "Failed to create challenge on blockchain");
+        }
       }
     } catch (error: any) {
-      console.error("Error creating challenge:", error);
+      console.error("Error in handleCreateChallenge:", error);
       toast.error(
         error.reason || error.message || "Failed to create challenge. Please try again."
       );

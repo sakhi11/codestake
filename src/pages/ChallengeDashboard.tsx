@@ -131,30 +131,7 @@ const ChallengeDashboard = () => {
     
     try {
       if (!networkDetails.isCorrectNetwork) {
-        toast({
-          title: "Network Mismatch",
-          description: (
-            <div>
-              <p>You're not connected to eduChain Testnet. Current network: {networkDetails.name} ({networkDetails.chainId})</p>
-              <div className="mt-2 p-2 bg-gray-100 dark:bg-gray-800 rounded text-sm">
-                <p className="font-semibold">Required Network Details:</p>
-                <ul className="list-disc pl-4 mt-1">
-                  <li>Name: {EDU_CHAIN_CONFIG.chainName}</li>
-                  <li>Chain ID: {EDU_CHAIN_CONFIG.chainId}</li>
-                  <li>RPC URL: {EDU_CHAIN_CONFIG.rpcUrls[0]}</li>
-                  <li>Symbol: {EDU_CHAIN_CONFIG.nativeCurrency.symbol}</li>
-                </ul>
-              </div>
-              <Button 
-                onClick={async () => await switchToEduChain()} 
-                className="w-full mt-3"
-              >
-                Switch Network
-              </Button>
-            </div>
-          ),
-          duration: 8000,
-        });
+        toast.error(`Network Mismatch. You're not connected to eduChain Testnet. Current network: ${networkDetails.name} (${networkDetails.chainId})`);
         return false;
       }
       return true;

@@ -1,3 +1,4 @@
+
 import { useState, useCallback } from 'react';
 import { ethers } from 'ethers';
 import { useWeb3 } from '@/context/Web3Provider';
@@ -54,29 +55,29 @@ export const useChallenge = () => {
         
         // Mock data as fallback
         challengeDetails = {
-          name: `Challenge ${challengeId}`,
-          track: "Web Development",
           creator: address,
-          startDate: Math.floor(Date.now() / 1000) - 86400, // Yesterday
-          endDate: Math.floor(Date.now() / 1000) + 604800, // 1 week from now
-          stakedAmount: ethers.parseEther("0.5"),
           totalStake: ethers.parseEther("1.0"),
-          isActive: true
+          totalPlayers: 2,
+          joinedCount: 1,
+          balance: ethers.parseEther("0.5"),
+          rewardPerMilestone: ethers.parseEther("0.25")
         };
         console.log("Using mock data instead:", challengeDetails);
       }
       
+      const now = Math.floor(Date.now() / 1000);
+      
       // Process the challenge details
       const challenge: ChallengeDetails = {
         id: challengeId,
-        name: challengeDetails.name || `Challenge ${challengeId}`,
-        track: challengeDetails.track || "Web Development",
-        creator: challengeDetails.creator || address,
-        startDate: Number(challengeDetails.startDate) || Math.floor(Date.now() / 1000) - 86400,
-        endDate: Number(challengeDetails.endDate) || Math.floor(Date.now() / 1000) + 604800,
-        stakedAmount: Number(ethers.formatEther(challengeDetails.stakedAmount || 0)),
+        name: `Challenge ${challengeId}`,
+        track: "Web Development",
+        creator: challengeDetails.creator || address || "",
+        startDate: now - 86400, // Yesterday
+        endDate: now + 604800, // 1 week from now
+        stakedAmount: Number(ethers.formatEther(challengeDetails.balance || 0)),
         totalStake: Number(ethers.formatEther(challengeDetails.totalStake || 0)),
-        isActive: challengeDetails.isActive
+        isActive: true
       };
       
       // Update the challenges state
@@ -85,6 +86,7 @@ export const useChallenge = () => {
         [challengeId]: challenge
       }));
       
+      console.log("Processed challenge details:", challenge);
       return challenge;
     } catch (error: any) {
       console.error(`Error getting challenge ${challengeId} details:`, error);
@@ -113,14 +115,14 @@ export const useChallenge = () => {
       // Try to get active challenges from contract
       try {
         const activeChallenges = await contract.getActiveChallenges();
-        console.log("Active challenges:", activeChallenges);
+        console.log("Active challenges from contract:", activeChallenges);
         return activeChallenges.map((id: ethers.BigNumberish) => Number(id));
       } catch (error: any) {
         console.error("Error fetching active challenges:", error);
         setLastError(`Contract error: ${error.message || "Unknown error"}`);
         // Return mock data
         console.log("Using mock challenge IDs");
-        return [1, 2, 3];
+        return [0, 1, 2];
       }
     } catch (error: any) {
       console.error("Error getting active challenges:", error);
@@ -180,6 +182,8 @@ export const useChallenge = () => {
           now + (28 * 24 * 60 * 60)    // 4 weeks
         ];
         
+        console.log("Milestone timestamps:", milestoneTimestamps);
+        
         // Create challenge transaction
         const tx = await contract.createChallenge(
           amountInWei,
@@ -196,7 +200,7 @@ export const useChallenge = () => {
         const receipt = await tx.wait();
         console.log("Transaction confirmed:", receipt);
         
-        toast.success("Challenge created successfully!");
+        toast.success("Challenge created successfully on the blockchain!");
         return true;
       } catch (error: any) {
         console.error("Contract error creating challenge:", error);

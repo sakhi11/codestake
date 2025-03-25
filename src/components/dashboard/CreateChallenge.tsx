@@ -108,6 +108,8 @@ const CreateChallenge: React.FC<CreateChallengeProps> = ({ onCreateChallenge, wa
         stakeAmount,
         track,
       };
+      
+      console.log("Creating challenge with details:", newChallenge);
       await onCreateChallenge(newChallenge);
       
       // Reset form after successful submission

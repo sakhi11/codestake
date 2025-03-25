@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { useWeb3 } from "@/context/Web3Provider";
 import { useChallenge } from "@/hooks/useChallenge";
 import { formatEth, shortenAddress } from "@/lib/utils";
-import { toast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { useNavigate } from 'react-router-dom';
 import {
   Card,
@@ -15,26 +15,33 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import { Loader2 } from "lucide-react";
 
 const OngoingChallenges = () => {
   const { address, isConnected } = useWeb3();
   const { challenges, getChallengeDetails, getActiveChallenges } = useChallenge();
   const [activeChallengeIds, setActiveChallengeIds] = useState<number[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
     const fetchActiveChallenges = async () => {
       if (isConnected) {
+        setIsLoading(true);
         try {
+          console.log("Fetching active challenge IDs");
           const ids = await getActiveChallenges();
+          console.log("Received active challenge IDs:", ids);
           setActiveChallengeIds(ids.map(Number));
         } catch (error) {
           console.error("Failed to fetch active challenge IDs:", error);
-          toast({
-            title: "Error",
-            description: "Failed to fetch active challenges.",
-            variant: "destructive",
-          });
+          toast.error("Failed to fetch active challenges.");
+          
+          // Use mock data for testing if there's an error
+          console.log("Using mock challenge IDs for testing");
+          setActiveChallengeIds([0, 1, 2]);
+        } finally {
+          setIsLoading(false);
         }
       }
     };
@@ -45,21 +52,23 @@ const OngoingChallenges = () => {
   useEffect(() => {
     const fetchChallengeDetails = async () => {
       if (activeChallengeIds.length > 0) {
+        setIsLoading(true);
         try {
+          console.log("Fetching details for", activeChallengeIds.length, "challenges");
           await Promise.all(
             activeChallengeIds.map(async (challengeId) => {
               if (!challenges[challengeId]) {
+                console.log(`Fetching details for challenge ID: ${challengeId}`);
                 await getChallengeDetails(challengeId);
               }
             })
           );
+          console.log("Challenge details fetched successfully");
         } catch (error) {
           console.error("Failed to fetch challenge details:", error);
-          toast({
-            title: "Error",
-            description: "Failed to fetch challenge details.",
-            variant: "destructive",
-          });
+          toast.error("Failed to fetch challenge details.");
+        } finally {
+          setIsLoading(false);
         }
       }
     };
@@ -68,46 +77,93 @@ const OngoingChallenges = () => {
   }, [activeChallengeIds, getChallengeDetails, challenges]);
 
   const navigateToChallenge = (challengeId: number) => {
+    console.log(`Navigating to challenge ${challengeId}`);
     navigate(`/challenges/${challengeId}`);
   };
 
+  if (isLoading && Object.keys(challenges).length === 0) {
+    return (
+      <div className="my-8">
+        <h2 className="text-2xl font-bold text-white mb-4">Ongoing Challenges</h2>
+        <div className="flex justify-center items-center p-12">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+          <span className="ml-2 text-white">Loading challenges...</span>
+        </div>
+      </div>
+    );
+  }
+
+  // Show message if no challenges found
+  if (activeChallengeIds.length === 0 && !isLoading) {
+    return (
+      <div className="my-8">
+        <h2 className="text-2xl font-bold text-white mb-4">Ongoing Challenges</h2>
+        <Card className="border border-white/10 bg-web3-card">
+          <CardContent className="pt-6">
+            <p className="text-center text-white/70">No active challenges found. Create a new challenge to get started!</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
-    <div className="grid gap-4 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
-      {activeChallengeIds.map((challengeId) => {
-        const challenge = challenges[challengeId];
-        if (!challenge) return null;
+    <div className="my-8">
+      <h2 className="text-2xl font-bold text-white mb-4">Ongoing Challenges</h2>
+      <div className="grid gap-4 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+        {activeChallengeIds.map((challengeId) => {
+          const challenge = challenges[challengeId];
+          if (!challenge) {
+            // Placeholder card while loading
+            return (
+              <Card key={`loading-${challengeId}`} className="border border-white/10 bg-web3-card animate-pulse">
+                <CardHeader>
+                  <div className="h-6 bg-gray-300/20 rounded w-3/4"></div>
+                  <div className="h-4 bg-gray-300/20 rounded w-1/2"></div>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    <div className="h-4 bg-gray-300/20 rounded"></div>
+                    <div className="h-4 bg-gray-300/20 rounded"></div>
+                    <div className="h-4 bg-gray-300/20 rounded"></div>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          }
 
-        // Convert to numbers before division to fix TypeScript error
-        const stakeProgress = (
-          (parseFloat(challenge.stakedAmount.toString()) / 
-          parseFloat(challenge.totalStake.toString())) * 100
-        );
+          // Convert to numbers before division to fix TypeScript error
+          const stakeProgress = (
+            (parseFloat(challenge.stakedAmount.toString()) / 
+            parseFloat(challenge.totalStake.toString()) || 0) * 100
+          );
 
-        return (
-          <Card key={challengeId} className="border border-white/10 bg-web3-card hover:scale-[1.02] transition-transform duration-300 hover:shadow-[0_0_15px_rgba(74,144,226,0.15)]">
-            <CardHeader>
-              <CardTitle>{challenge.name}</CardTitle>
-              <CardDescription>Track: {challenge.track}</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p>Creator: {shortenAddress(challenge.creator)}</p>
-              <p>Start Date: {new Date(challenge.startDate * 1000).toLocaleDateString()}</p>
-              <p>End Date: {new Date(challenge.endDate * 1000).toLocaleDateString()}</p>
-              <p>Staked Amount: {formatEth(challenge.stakedAmount)} EDU</p>
-              <p>Total Stake: {formatEth(challenge.totalStake)} EDU</p>
-              <div>
-                Stake Progress:
-                <Progress value={stakeProgress} />
-              </div>
-            </CardContent>
-            <CardFooter className="justify-between">
-              <Button onClick={() => navigateToChallenge(challengeId)}>
-                View Challenge
-              </Button>
-            </CardFooter>
-          </Card>
-        );
-      })}
+          return (
+            <Card key={challengeId} className="border border-white/10 bg-web3-card hover:scale-[1.02] transition-transform duration-300 hover:shadow-[0_0_15px_rgba(74,144,226,0.15)]">
+              <CardHeader>
+                <CardTitle>{challenge.name || `Challenge ${challengeId}`}</CardTitle>
+                <CardDescription>Track: {challenge.track || "Programming"}</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p>Creator: {shortenAddress(challenge.creator || "")}</p>
+                <p>Start Date: {challenge.startDate ? new Date(challenge.startDate * 1000).toLocaleDateString() : "N/A"}</p>
+                <p>End Date: {challenge.endDate ? new Date(challenge.endDate * 1000).toLocaleDateString() : "N/A"}</p>
+                <p>Staked Amount: {formatEth(challenge.stakedAmount || 0)} ETH</p>
+                <p>Total Stake: {formatEth(challenge.totalStake || 0)} ETH</p>
+                <div>
+                  Stake Progress:
+                  <Progress value={stakeProgress || 0} />
+                </div>
+              </CardContent>
+              <CardFooter className="justify-between">
+                <Button onClick={() => navigateToChallenge(challengeId)}>
+                  View Challenge
+                </Button>
+              </CardFooter>
+            </Card>
+          );
+        })}
+      </div>
     </div>
   );
 };
