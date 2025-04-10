@@ -1,69 +1,75 @@
-# Welcome to your Lovable project
+# CodeStake 🎯
 
-## Project info
+**CodeStake** is a web app that turns learning into a challenge — quite literally! Compete with friends by staking a set amount and racing to complete learning milestones. Whoever hits the milestones first gets rewarded from the staked pool. It’s all about accountability, motivation, and a bit of friendly competition.
 
-**URL**: https://lovable.dev/projects/2711ca0f-0d5a-4ff9-996c-ef2b55c3a64b
+## 🚀 Why CodeStake?
 
-## How can I edit this code?
+- Learning is hard. Staying consistent is harder.
+- With CodeStake, you **set learning goals**, **stake real value**, and **compete with a friend** to reach the finish line.
+- The more you complete, the more you earn. Fall behind? Well, you snooze, you lose (your stake).
 
-There are several ways of editing your application.
+## 🧠 How It Works
 
-**Use Lovable**
+1. **Create a Challenge:** Choose a topic, set milestones, and invite a friend.
+2. **Stake an Amount:** Both parties lock in an equal stake.
+3. **Track Progress:** Complete milestones and update progress.
+4. **Win Rewards:** For every milestone achieved, the system distributes a portion of the stake to the one who reaches it first.
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/2711ca0f-0d5a-4ff9-996c-ef2b55c3a64b) and start prompting.
+> Example: You and your friend stake ₹1000 each. For every milestone (e.g., completing a React module), the first to complete gets ₹200 from the pool.
 
-Changes made via Lovable will be committed automatically to this repo.
+## 🛠️ Tech Stack
 
-**Use your preferred IDE**
+- **Frontend:** React + Bun
+- **Smart Contracts:** Solidity (Ethereum/Polygon based)
+- **Blockchain Tools:** Ethers.js, Hardhat
+- **Storage & Backend:** IPFS / Future plans for Supabase
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+## 📦 Getting Started
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+Clone the repo and get started locally:
 
-Follow these steps:
+```bash
+git clone https://github.com/codewithrakshit/codestake.git
+cd codestake
+bun install
+bun run dev
+Make sure your local blockchain (like Hardhat or Ganache) is running and configured.
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+📁 Project Structure
+php
+Copy
+Edit
+codestake/
+├── contracts/         # Smart contracts (stake + challenge logic)
+├── src/               # React frontend code
+├── public/            # Static files
+├── scripts/           # Contract deployment and interaction
+├── bun.lockb          # Bun package lock
+└── README.md
+✨ Features
+Create & join learning challenges
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+Stake securely using blockchain
 
-# Step 3: Install the necessary dependencies.
-npm i
+Real-time progress tracking
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
-```
+Auto-distribution of rewards on milestone completion
 
-**Edit a file directly in GitHub**
+Minimal UI with intuitive UX
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+🧪 Upcoming Ideas
+Group challenges with leaderboard
 
-**Use GitHub Codespaces**
+NFT badges for completed milestones
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+Learning resource suggestions for each topic
 
-## What technologies are used for this project?
+Discord/Slack bot integrations
 
-This project is built with .
+🧑‍💻 Contributing
+Got ideas to improve CodeStake? Contributions are welcome! Fork the repo, make your changes, and send a PR.
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+📄 License
+MIT License — feel free to remix and build on it.
 
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/2711ca0f-0d5a-4ff9-996c-ef2b55c3a64b) and click on Share -> Publish.
-
-## I want to use a custom domain - is that possible?
-
-We don't support custom domains (yet). If you want to deploy your project under your own domain then we recommend using Netlify. Visit our docs for more details: [Custom domains](https://docs.lovable.dev/tips-tricks/custom-domain/)
+💡 CodeStake isn’t just about winning. It’s about growing — and doing it with people who push you to be better.
