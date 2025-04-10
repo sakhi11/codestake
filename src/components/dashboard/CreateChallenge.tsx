@@ -16,12 +16,13 @@ import { Button } from "@/components/ui/button";
 import { useWeb3 } from "@/context/Web3Provider";
 import { Loader2, AlertCircle } from "lucide-react";
 import { shortenAddress } from "@/lib/utils";
+import { Textarea } from "@/components/ui/textarea";
 
 interface NewChallenge {
-  player1: string;
-  player2: string;
+  name: string;
+  description: string;
   stakeAmount: string;
-  track: string;
+  participantCount: number;
 }
 
 interface CreateChallengeProps {
@@ -30,35 +31,25 @@ interface CreateChallengeProps {
 }
 
 const CreateChallenge: React.FC<CreateChallengeProps> = ({ onCreateChallenge, walletBalance }) => {
-  const [player1, setPlayer1] = useState("");
-  const [player2, setPlayer2] = useState("");
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
   const [stakeAmount, setStakeAmount] = useState("");
-  const [track, setTrack] = useState("");
+  const [participantCount, setParticipantCount] = useState(2);
   const [isLoading, setIsLoading] = useState(false);
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const { address, isConnected, networkDetails } = useWeb3();
 
-  // Set current wallet as player1 by default when connected
-  useEffect(() => {
-    if (address && !player1) {
-      setPlayer1(address);
-    }
-  }, [address, player1]);
-
   const validateInputs = () => {
     const errors: Record<string, string> = {};
     
-    // Validate addresses
-    if (!ethers.isAddress(player1)) {
-      errors.player1 = "Invalid ethereum address format";
+    // Validate name
+    if (!name.trim()) {
+      errors.name = "Challenge name cannot be empty";
     }
     
-    if (!ethers.isAddress(player2)) {
-      errors.player2 = "Invalid ethereum address format";
-    }
-    
-    if (player1 && player2 && player1.toLowerCase() === player2.toLowerCase()) {
-      errors.player2 = "Player 2 must be different from Player 1";
+    // Validate description
+    if (!description.trim()) {
+      errors.description = "Challenge description cannot be empty";
     }
     
     // Validate stake amount
@@ -71,9 +62,9 @@ const CreateChallenge: React.FC<CreateChallengeProps> = ({ onCreateChallenge, wa
       errors.stakeAmount = `Insufficient funds (balance: ${walletBalance} ETH)`;
     }
     
-    // Validate track
-    if (!track.trim()) {
-      errors.track = "Track cannot be empty";
+    // Validate participant count
+    if (participantCount < 2) {
+      errors.participantCount = "Must have at least 2 participants";
     }
     
     setValidationErrors(errors);
@@ -103,19 +94,20 @@ const CreateChallenge: React.FC<CreateChallengeProps> = ({ onCreateChallenge, wa
     setIsLoading(true);
     try {
       const newChallenge = {
-        player1,
-        player2,
+        name,
+        description,
         stakeAmount,
-        track,
+        participantCount
       };
       
       console.log("Creating challenge with details:", newChallenge);
       await onCreateChallenge(newChallenge);
       
       // Reset form after successful submission
-      setPlayer2("");
+      setName("");
+      setDescription("");
       setStakeAmount("");
-      setTrack("");
+      setParticipantCount(2);
       
       // Show success message
       toast.success("Challenge created successfully!");
@@ -135,61 +127,52 @@ const CreateChallenge: React.FC<CreateChallengeProps> = ({ onCreateChallenge, wa
       <CardHeader>
         <CardTitle className="text-white">Create Challenge</CardTitle>
         <CardDescription className="text-white/60">
-          Challenge your friend to complete coding tasks and stake ETH!
+          Create a new coding challenge and stake ETH!
         </CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <Label htmlFor="player1" className="text-white">
-              Player 1 Address (You)
+            <Label htmlFor="name" className="text-white">
+              Challenge Name
             </Label>
             <Input
               type="text"
-              id="player1"
-              placeholder="0x..."
-              value={player1}
-              onChange={(e) => setPlayer1(e.target.value)}
-              className={`${inputClass} ${validationErrors.player1 ? errorClass : ""}`}
+              id="name"
+              placeholder="e.g. Web3 Development Challenge"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className={`${inputClass} ${validationErrors.name ? errorClass : ""}`}
               disabled={isLoading}
             />
-            {validationErrors.player1 && (
+            {validationErrors.name && (
               <p className="text-red-500 text-sm mt-1 flex items-center">
                 <AlertCircle className="h-3 w-3 mr-1" />
-                {validationErrors.player1}
-              </p>
-            )}
-            {player1 && ethers.isAddress(player1) && (
-              <p className="text-white/60 text-sm mt-1">
-                {shortenAddress(player1)}
+                {validationErrors.name}
               </p>
             )}
           </div>
+          
           <div>
-            <Label htmlFor="player2" className="text-white">
-              Player 2 Address (Opponent)
+            <Label htmlFor="description" className="text-white">
+              Description
             </Label>
-            <Input
-              type="text"
-              id="player2"
-              placeholder="0x..."
-              value={player2}
-              onChange={(e) => setPlayer2(e.target.value)}
-              className={`${inputClass} ${validationErrors.player2 ? errorClass : ""}`}
+            <Textarea
+              id="description"
+              placeholder="Describe the challenge..."
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              className={`${inputClass} ${validationErrors.description ? errorClass : ""} min-h-[100px]`}
               disabled={isLoading}
             />
-            {validationErrors.player2 && (
+            {validationErrors.description && (
               <p className="text-red-500 text-sm mt-1 flex items-center">
                 <AlertCircle className="h-3 w-3 mr-1" />
-                {validationErrors.player2}
-              </p>
-            )}
-            {player2 && ethers.isAddress(player2) && (
-              <p className="text-white/60 text-sm mt-1">
-                {shortenAddress(player2)}
+                {validationErrors.description}
               </p>
             )}
           </div>
+          
           <div>
             <Label htmlFor="stakeAmount" className="text-white">
               Stake Amount (ETH)
@@ -217,26 +200,29 @@ const CreateChallenge: React.FC<CreateChallengeProps> = ({ onCreateChallenge, wa
               </p>
             )}
           </div>
+          
           <div>
-            <Label htmlFor="track" className="text-white">
-              Track
+            <Label htmlFor="participantCount" className="text-white">
+              Number of Participants
             </Label>
             <Input
-              type="text"
-              id="track"
-              placeholder="e.g. Web Development"
-              value={track}
-              onChange={(e) => setTrack(e.target.value)}
-              className={`${inputClass} ${validationErrors.track ? errorClass : ""}`}
+              type="number"
+              id="participantCount"
+              placeholder="2"
+              value={participantCount}
+              onChange={(e) => setParticipantCount(parseInt(e.target.value))}
+              className={`${inputClass} ${validationErrors.participantCount ? errorClass : ""}`}
               disabled={isLoading}
+              min="2"
             />
-            {validationErrors.track && (
+            {validationErrors.participantCount && (
               <p className="text-red-500 text-sm mt-1 flex items-center">
                 <AlertCircle className="h-3 w-3 mr-1" />
-                {validationErrors.track}
+                {validationErrors.participantCount}
               </p>
             )}
           </div>
+          
           <Button
             type="submit"
             className="w-full"

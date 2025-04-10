@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Loader2 } from "lucide-react";
+import { Loader2, User, Info } from "lucide-react";
 
 const OngoingChallenges = () => {
   const { address, isConnected } = useWeb3();
@@ -36,10 +36,6 @@ const OngoingChallenges = () => {
         } catch (error) {
           console.error("Failed to fetch active challenge IDs:", error);
           toast.error("Failed to fetch active challenges.");
-          
-          // Use mock data for testing if there's an error
-          console.log("Using mock challenge IDs for testing");
-          setActiveChallengeIds([0, 1, 2]);
         } finally {
           setIsLoading(false);
         }
@@ -134,22 +130,21 @@ const OngoingChallenges = () => {
 
           // Convert to numbers before division to fix TypeScript error
           const stakeProgress = (
-            (parseFloat(challenge.stakedAmount.toString()) / 
-            parseFloat(challenge.totalStake.toString()) || 0) * 100
+            (Number(challenge.totalStakePaid) / 
+            Number(challenge.totalStakeNeeded) || 0) * 100
           );
 
           return (
             <Card key={challengeId} className="border border-white/10 bg-web3-card hover:scale-[1.02] transition-transform duration-300 hover:shadow-[0_0_15px_rgba(74,144,226,0.15)]">
               <CardHeader>
                 <CardTitle>{challenge.name || `Challenge ${challengeId}`}</CardTitle>
-                <CardDescription>Track: {challenge.track || "Programming"}</CardDescription>
+                <CardDescription>{challenge.description || "No description available"}</CardDescription>
               </CardHeader>
               <CardContent>
-                <p>Creator: {shortenAddress(challenge.creator || "")}</p>
-                <p>Start Date: {challenge.startDate ? new Date(challenge.startDate * 1000).toLocaleDateString() : "N/A"}</p>
-                <p>End Date: {challenge.endDate ? new Date(challenge.endDate * 1000).toLocaleDateString() : "N/A"}</p>
-                <p>Staked Amount: {formatEth(challenge.stakedAmount || 0)} ETH</p>
-                <p>Total Stake: {formatEth(challenge.totalStake || 0)} ETH</p>
+                <p><User className="inline h-4 w-4 mr-1" /> Creator: {shortenAddress(challenge.creator || "")}</p>
+                <p>Stake Amount: {formatEth(challenge.stakeAmount || 0)} ETH</p>
+                <p>Total Stake Needed: {formatEth(challenge.totalStakeNeeded || 0)} ETH</p>
+                <p>Stake Paid: {formatEth(challenge.totalStakePaid || 0)} ETH</p>
                 <div>
                   Stake Progress:
                   <Progress value={stakeProgress || 0} />
@@ -159,6 +154,11 @@ const OngoingChallenges = () => {
                 <Button onClick={() => navigateToChallenge(challengeId)}>
                   View Challenge
                 </Button>
+                {challenge.isActive && (
+                  <Button variant="outline">
+                    <Info className="h-4 w-4 mr-1" /> Active
+                  </Button>
+                )}
               </CardFooter>
             </Card>
           );

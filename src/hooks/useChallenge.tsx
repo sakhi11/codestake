@@ -8,16 +8,13 @@ import { CONTRACT_ADDRESS, CONTRACT_ABI } from '@/lib/utils';
 export interface ChallengeDetails {
   id: number;
   name: string;
-  track: string;
+  description: string;
   creator: string;
-  player1?: string;
-  player2?: string;
-  startDate: number;
-  endDate: number;
-  stakedAmount: number;
-  totalStake: number;
+  stakeAmount: number;
+  totalStakeNeeded: number;
+  totalStakePaid: number;
   isActive: boolean;
-  milestones?: any[];
+  track?: string; // For backward compatibility
 }
 
 export const useChallenge = () => {
@@ -41,43 +38,52 @@ export const useChallenge = () => {
       setIsLoading(true);
       setLastError(null);
       
-      // Call the contract to get challenge details
+      console.log("Fetching challenge details for ID:", challengeId);
+      
+      // Call the contract to get challenge details - use the new getChallengeDetails function
       let challengeDetails;
       
       try {
-        // The actual contract call
-        console.log("Fetching challenge details for ID:", challengeId);
-        challengeDetails = await contract.challenges(challengeId);
+        // The actual contract call using new function
+        challengeDetails = await contract.getChallengeDetails(challengeId);
         console.log("Challenge details received:", challengeDetails);
       } catch (error: any) {
-        console.error("Error fetching from contract:", error);
+        console.error("Error fetching challenge details:", error);
         setLastError(`Contract error: ${error.message || "Unknown error"}`);
         
-        // Mock data as fallback
-        challengeDetails = {
-          creator: address,
-          totalStake: ethers.parseEther("1.0"),
-          totalPlayers: 2,
-          joinedCount: 1,
-          balance: ethers.parseEther("0.5"),
-          rewardPerMilestone: ethers.parseEther("0.25")
-        };
-        console.log("Using mock data instead:", challengeDetails);
+        try {
+          // Fallback to challenges mapping if getChallengeDetails fails
+          challengeDetails = await contract.challenges(challengeId);
+          console.log("Challenge details from mapping:", challengeDetails);
+        } catch (fallbackError: any) {
+          console.error("Error with fallback fetch:", fallbackError);
+          
+          // Mock data as last resort
+          challengeDetails = {
+            id: challengeId,
+            name: `Challenge ${challengeId}`,
+            description: "Mock challenge description",
+            creator: address,
+            stakeAmount: ethers.parseEther("0.1"),
+            totalStakeNeeded: ethers.parseEther("0.5"),
+            totalStakePaid: ethers.parseEther("0.1"),
+            isActive: true
+          };
+          console.log("Using mock data instead:", challengeDetails);
+        }
       }
       
-      const now = Math.floor(Date.now() / 1000);
-      
-      // Process the challenge details
+      // Process the challenge details - handle both struct return and mapping return formats
       const challenge: ChallengeDetails = {
-        id: challengeId,
-        name: `Challenge ${challengeId}`,
-        track: "Web Development",
+        id: Number(challengeDetails.id || challengeId),
+        name: challengeDetails.name || `Challenge ${challengeId}`,
+        description: challengeDetails.description || "",
         creator: challengeDetails.creator || address || "",
-        startDate: now - 86400, // Yesterday
-        endDate: now + 604800, // 1 week from now
-        stakedAmount: Number(ethers.formatEther(challengeDetails.balance || 0)),
-        totalStake: Number(ethers.formatEther(challengeDetails.totalStake || 0)),
-        isActive: true
+        stakeAmount: Number(ethers.formatEther(challengeDetails.stakeAmount || 0)),
+        totalStakeNeeded: Number(ethers.formatEther(challengeDetails.totalStakeNeeded || 0)),
+        totalStakePaid: Number(ethers.formatEther(challengeDetails.totalStakePaid || 0)),
+        isActive: challengeDetails.isActive !== undefined ? challengeDetails.isActive : true,
+        track: "Programming" // Default track for compatibility
       };
       
       // Update the challenges state
@@ -112,17 +118,49 @@ export const useChallenge = () => {
       setLastError(null);
       console.log("Fetching active challenges...");
       
-      // Try to get active challenges from contract
       try {
-        const activeChallenges = await contract.getActiveChallenges();
-        console.log("Active challenges from contract:", activeChallenges);
-        return activeChallenges.map((id: ethers.BigNumberish) => Number(id));
+        // Get total challenge count from the new contract
+        const count = await contract.getChallengeIdCount();
+        console.log("Total challenge count:", Number(count));
+        
+        if (Number(count) === 0) {
+          console.log("No challenges found");
+          return [];
+        }
+        
+        // Get all challenge IDs using getChallengeIds function
+        // Limited to the first 10 for performance
+        const limit = count < 10 ? Number(count) : 10;
+        const ids = await contract.getChallengeIds(0, limit);
+        console.log("Challenge IDs:", ids);
+        
+        return ids.map((id: ethers.BigNumberish) => Number(id));
       } catch (error: any) {
-        console.error("Error fetching active challenges:", error);
-        setLastError(`Contract error: ${error.message || "Unknown error"}`);
-        // Return mock data
-        console.log("Using mock challenge IDs");
-        return [0, 1, 2];
+        console.error("Error fetching challenge IDs:", error);
+        
+        try {
+          // Fallback: try getting total count and then fetch individual IDs
+          const count = await contract.challengeCount();
+          console.log("Challenge count from fallback:", Number(count));
+          
+          const ids = [];
+          for (let i = 0; i < Number(count) && i < 10; i++) {
+            try {
+              const id = await contract.challengeIds(i);
+              ids.push(Number(id));
+            } catch (idError) {
+              console.error(`Error fetching challenge ID at index ${i}:`, idError);
+            }
+          }
+          
+          console.log("Challenge IDs from fallback:", ids);
+          return ids;
+        } catch (fallbackError) {
+          console.error("Fallback error:", fallbackError);
+          // Return mock IDs as last resort
+          console.log("Using mock challenge IDs");
+          return [0, 1, 2];
+        }
       }
     } catch (error: any) {
       console.error("Error getting active challenges:", error);
@@ -134,10 +172,10 @@ export const useChallenge = () => {
   }, [isConnected, contract, networkDetails]);
 
   const createChallenge = useCallback(async (
-    player1: string,
-    player2: string,
+    name: string,
+    description: string,
     stakeAmount: string,
-    track: string
+    participantCount: number
   ) => {
     if (!isConnected || !signer || !contract) {
       toast.error("Wallet not connected");
@@ -149,48 +187,28 @@ export const useChallenge = () => {
       return false;
     }
 
-    if (!ethers.isAddress(player1) || !ethers.isAddress(player2)) {
-      toast.error("Invalid ethereum addresses provided");
-      return false;
-    }
-
-    if (player1.toLowerCase() === player2.toLowerCase()) {
-      toast.error("Player 1 and Player 2 must be different");
-      return false;
-    }
-
     try {
       setIsLoading(true);
       setLastError(null);
       
       // Convert stake amount to wei
       const amountInWei = ethers.parseEther(stakeAmount);
-      console.log("Creating challenge with stake:", stakeAmount, "ETH");
-      console.log("Players:", player1, player2);
-      console.log("Track:", track);
+      console.log("Creating challenge with parameters:", {
+        name,
+        description,
+        stakeAmount: stakeAmount + " ETH",
+        participantCount
+      });
       
-      // Call the contract to create a challenge
+      // Call the contract to create a challenge using the new function signature
       try {
         console.log("Sending transaction to contract...");
         
-        // Calculate milestone dates (4 milestones, 1 week apart)
-        const now = Math.floor(Date.now() / 1000);
-        const milestoneTimestamps = [
-          now + (7 * 24 * 60 * 60),    // 1 week
-          now + (14 * 24 * 60 * 60),   // 2 weeks
-          now + (21 * 24 * 60 * 60),   // 3 weeks
-          now + (28 * 24 * 60 * 60)    // 4 weeks
-        ];
-        
-        console.log("Milestone timestamps:", milestoneTimestamps);
-        
-        // Create challenge transaction
         const tx = await contract.createChallenge(
+          name,
+          description,
           amountInWei,
-          2, // totalPlayers (fixed at 2)
-          [player1, player2],
-          milestoneTimestamps,
-          { value: amountInWei }
+          participantCount
         );
         
         console.log("Transaction sent:", tx.hash);
@@ -227,9 +245,9 @@ export const useChallenge = () => {
     }
   }, [isConnected, signer, contract, networkDetails]);
 
-  const completeMilestone = useCallback(async (
+  const joinChallenge = useCallback(async (
     challengeId: number,
-    milestoneIndex: number
+    stakeAmount: string
   ) => {
     if (!isConnected || !signer || !contract) {
       toast.error("Wallet not connected");
@@ -239,25 +257,61 @@ export const useChallenge = () => {
     try {
       setIsLoading(true);
       
-      // Call the contract to complete a milestone
+      // Call the contract to join a challenge
       try {
-        const tx = await contract.completeMilestone(challengeId, milestoneIndex);
-        await tx.wait();
-        toast.success("Milestone completed successfully!");
+        const amountInWei = ethers.parseEther(stakeAmount);
+        console.log(`Joining challenge ${challengeId} with stake ${stakeAmount} ETH`);
+        
+        const tx = await contract.joinChallenge(challengeId, {
+          value: amountInWei
+        });
+        
+        console.log("Transaction sent:", tx.hash);
+        toast.success("Transaction sent! Waiting for confirmation...");
+        
+        const receipt = await tx.wait();
+        console.log("Transaction confirmed:", receipt);
+        
+        toast.success("Successfully joined the challenge!");
         return true;
       } catch (error: any) {
-        console.error("Contract error completing milestone:", error);
-        toast.error(`Failed to complete milestone: ${error.message || "Unknown error"}`);
+        console.error("Contract error joining challenge:", error);
+        
+        if (error.message?.includes("insufficient funds")) {
+          toast.error("Insufficient funds to join challenge");
+        } else if (error.message?.includes("user rejected")) {
+          toast.error("Transaction was rejected");
+        } else {
+          toast.error(`Failed to join challenge: ${error.message || "Unknown error"}`);
+        }
+        
         return false;
       }
     } catch (error: any) {
-      console.error("Error completing milestone:", error);
-      toast.error(`Failed to complete milestone: ${error.message || "Unknown error"}`);
+      console.error("Error joining challenge:", error);
+      toast.error(`Failed to join challenge: ${error.message || "Unknown error"}`);
       return false;
     } finally {
       setIsLoading(false);
     }
   }, [isConnected, signer, contract]);
+
+  const isParticipant = useCallback(async (
+    challengeId: number,
+    participantAddress: string
+  ) => {
+    if (!isConnected || !contract) {
+      return false;
+    }
+
+    try {
+      const result = await contract.isParticipant(challengeId, participantAddress);
+      return result;
+    } catch (error) {
+      console.error("Error checking participant status:", error);
+      return false;
+    }
+  }, [isConnected, contract]);
 
   return {
     challenges,
@@ -266,7 +320,8 @@ export const useChallenge = () => {
     getChallengeDetails,
     getActiveChallenges,
     createChallenge,
-    completeMilestone
+    joinChallenge,
+    isParticipant
   };
 };
 

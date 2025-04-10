@@ -1,8 +1,6 @@
-import { ethers } from "ethers";
 
-// Your deployed contract details
-const CONTRACT_ADDRESS = "YOUR_DEPLOYED_CONTRACT_ADDRESS";
-const CONTRACT_ABI = [ /* Paste your ABI here */ ];
+import { ethers } from "ethers";
+import { CONTRACT_ADDRESS, CONTRACT_ABI } from "@/lib/utils";
 
 export const getContract = async () => {
   if (!window.ethereum) throw new Error("MetaMask is not installed");
