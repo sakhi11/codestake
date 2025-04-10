@@ -1,11 +1,12 @@
+
 import { ethers } from "hardhat";
 
 async function main() {
-  const CodeStake = await ethers.getContractFactory("CodeStake");
-  const codeStake = await CodeStake.deploy();
-  await codeStake.deployed();
+  const ChallengeManager = await ethers.getContractFactory("ChallengeManager");
+  const challengeManager = await ChallengeManager.deploy();
+  await challengeManager.deployed();
 
-  console.log("CodeStake deployed to:", codeStake.address);
+  console.log("ChallengeManager deployed to:", challengeManager.address);
 }
 
 main()
