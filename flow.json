@@ -1,0 +1,19 @@
+{
+  "networks": {
+    "testnet": "access.devnet.nodes.onflow.org:9000"
+  },
+  "accounts": {
+    "deployer-account": {
+      "address": "0x151494e9e083c718",
+      "key": "dda2572ca22d662e7bd2e73c7f401ade3491e6a4190a3e775d5cc2f88b824c18"
+    }
+  },
+  "contracts": {
+    "CodeStake": "./flow-contracts/CodeStake.cdc"
+  },
+  "deployments": {
+    "testnet": {
+      "deployer-account": ["CodeStake"]
+    }
+  }
+}
